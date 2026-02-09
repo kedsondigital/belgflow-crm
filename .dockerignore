@@ -27,6 +27,11 @@ dist
 *.swp
 *.swo
 
+# Deploy outputs
+hostinger-deploy
+belgflow-crm-hostinger
+belgflow-crm-hostinger.zip
+
 # Misc
 .DS_Store
 README.md

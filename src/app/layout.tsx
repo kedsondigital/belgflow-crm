@@ -3,6 +3,9 @@ import localFont from 'next/font/local'
 import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
+// Evita prerender para que o build funcione sem env vars (Easypanel injeta em runtime)
+export const dynamic = 'force-dynamic'
+
 const geistSans = localFont({
   src: './fonts/GeistVF.woff',
   variable: '--font-geist-sans',

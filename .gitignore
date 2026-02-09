@@ -33,6 +33,10 @@ yarn-error.log*
 # vercel
 .vercel
 
+# hostinger deploy
+/hostinger-deploy/
+/belgflow-crm-hostinger.zip
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+export const dynamic = 'force-dynamic'
+
 /** Cria lead via API - tenta com todos os campos, fallback sem colunas extras se schema antigo */
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
