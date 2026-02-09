@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { getEnv } from './env'
 
 const PLACEHOLDERS = ['__NEXT_PUBLIC_SUPABASE_URL__', '__NEXT_PUBLIC_SUPABASE_ANON_KEY__']
 
@@ -9,8 +10,8 @@ function isValidConfig(url: string | undefined, key: string | undefined) {
 }
 
 export async function createClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabaseUrl = getEnv('NEXT_PUBLIC_SUPABASE_URL')
+  const supabaseAnonKey = getEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY')
 
   if (!isValidConfig(supabaseUrl, supabaseAnonKey)) {
     throw new Error(
