@@ -36,6 +36,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # Script que injeta env vars em runtime (Easypanel passa na aba Environment)
 COPY --from=builder /app/scripts/inject-env.mjs ./scripts/
 
+# nextjs precisa de permissão para criar .env.production.local em /app
+RUN chown -R nextjs:nodejs /app
+
 USER nextjs
 
 EXPOSE 3000
@@ -44,4 +47,4 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 # Injetar vars e iniciar servidor (vars vêm da aba Environment do Easypanel)
-CMD ["sh", "-c", "node scripts/inject-env.mjs && exec node server.js"]
+CMD ["node", "scripts/inject-env.mjs"]

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Injeta variáveis de ambiente e inicia o servidor.
- * Usa um script shell para garantir que as vars cheguem ao processo Node.
+ * Cria .env.production.local e repassa env ao processo Node (Easypanel não repassa ao filho).
  */
 
 import { readdir, readFile, writeFile } from 'fs/promises'
@@ -20,10 +20,6 @@ const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 if (!SUPABASE_URL || !SUPABASE_ANON) {
   console.error('Erro: NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY devem estar definidos no Easypanel (aba Environment)')
   process.exit(1)
-}
-
-function escapeSh(val) {
-  return String(val).replace(/'/g, "'\"'\"'")
 }
 
 async function replaceInFile(filePath) {
@@ -55,27 +51,30 @@ async function main() {
   // 1. Substitui placeholders nos arquivos .next (client bundle)
   await processDir(join(rootDir, '.next'))
 
-  // 2. Escreve script shell em .next/ ( temos permissão) que exporta vars e inicia o servidor
-  const runSh = `#!/bin/sh
-export NEXT_PUBLIC_SUPABASE_URL='${escapeSh(SUPABASE_URL)}'
-export NEXT_PUBLIC_SUPABASE_ANON_KEY='${escapeSh(SUPABASE_ANON)}'
-export NEXT_PUBLIC_SITE_URL='${escapeSh(SITE_URL || SUPABASE_URL)}'
-export SUPABASE_SERVICE_ROLE_KEY='${escapeSh(SERVICE_ROLE)}'
-export NODE_ENV=production
-export PORT="${process.env.PORT || '3000'}"
-export HOSTNAME="${process.env.HOSTNAME || '0.0.0.0'}"
-exec node server.js
-`
-  const runShPath = join(rootDir, '.next', 'run-server.sh')
-  await writeFile(runShPath, runSh, { mode: 0o755 })
+  // 2. Cria .env.production.local (Next.js carrega automaticamente ao iniciar)
+  const envContent = [
+    `NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL}`,
+    `NEXT_PUBLIC_SUPABASE_ANON_KEY=${SUPABASE_ANON}`,
+    `NEXT_PUBLIC_SITE_URL=${SITE_URL || SUPABASE_URL}`,
+    `SUPABASE_SERVICE_ROLE_KEY=${SERVICE_ROLE}`,
+    ...(process.env.N8N_INGEST_TOKEN ? [`N8N_INGEST_TOKEN=${process.env.N8N_INGEST_TOKEN}`] : []),
+    ...(process.env.N8N_DEDUPE_FIELD ? [`N8N_DEDUPE_FIELD=${process.env.N8N_DEDUPE_FIELD}`] : []),
+  ].join('\n')
+  await writeFile(join(rootDir, '.env.production.local'), envContent)
 
   console.log('Variáveis injetadas. Iniciando servidor...')
 
-  execSync('sh .next/run-server.sh', {
-    stdio: 'inherit',
-    cwd: rootDir,
-    env: { ...process.env, PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin' },
-  })
+  const serverEnv = {
+    ...process.env,
+    NEXT_PUBLIC_SUPABASE_URL: SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: SUPABASE_ANON,
+    NEXT_PUBLIC_SITE_URL: SITE_URL || SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY: SERVICE_ROLE,
+    NODE_ENV: 'production',
+    PORT: process.env.PORT || '3000',
+    HOSTNAME: process.env.HOSTNAME || '0.0.0.0',
+  }
+  execSync('node server.js', { stdio: 'inherit', cwd: rootDir, env: serverEnv })
 }
 
 main().catch((err) => {
