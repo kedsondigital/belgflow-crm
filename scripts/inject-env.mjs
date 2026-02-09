@@ -1,18 +1,21 @@
 #!/usr/bin/env node
 /**
- * Substitui placeholders nos arquivos do build pelas variáveis de ambiente em runtime.
- * Necessário porque o Easypanel não passa env como build-arg ao Docker.
+ * Injeta variáveis de ambiente e inicia o servidor.
+ * O Easypanel passa as vars para este script; repassamos explicitamente ao Node para garantir.
  */
 
 import { readdir, readFile, writeFile } from 'fs/promises'
+import { spawn } from 'child_process'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
+const rootDir = join(__dirname, '..')
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || SUPABASE_URL
+const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 if (!SUPABASE_URL || !SUPABASE_ANON) {
   console.error('Erro: NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY devem estar definidos no Easypanel (aba Environment)')
@@ -42,11 +45,49 @@ async function processDir(dir) {
   }
 }
 
-try {
+async function main() {
   console.log('Injectando variáveis de ambiente...')
-  await processDir(join(__dirname, '..', '.next'))
+
+  // 1. Substitui placeholders nos arquivos .next (client bundle)
+  await processDir(join(rootDir, '.next'))
+
+  // 2. Cria .env.production.local para Next.js carregar no startup
+  const envContent = [
+    `NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL}`,
+    `NEXT_PUBLIC_SUPABASE_ANON_KEY=${SUPABASE_ANON}`,
+    `NEXT_PUBLIC_SITE_URL=${SITE_URL || SUPABASE_URL}`,
+    `SUPABASE_SERVICE_ROLE_KEY=${SERVICE_ROLE || ''}`,
+    ...(process.env.N8N_INGEST_TOKEN ? [`N8N_INGEST_TOKEN=${process.env.N8N_INGEST_TOKEN}`] : []),
+    ...(process.env.N8N_DEDUPE_FIELD ? [`N8N_DEDUPE_FIELD=${process.env.N8N_DEDUPE_FIELD}`] : []),
+  ].join('\n')
+  await writeFile(join(rootDir, '.env.production.local'), envContent)
+
+  // 3. Inicia o servidor passando env explicitamente (garante que o Easypanel não perca as vars)
+  const serverEnv = {
+    ...process.env,
+    NEXT_PUBLIC_SUPABASE_URL: SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: SUPABASE_ANON,
+    NEXT_PUBLIC_SITE_URL: SITE_URL || SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY: SERVICE_ROLE || '',
+    NODE_ENV: 'production',
+    PORT: process.env.PORT || '3000',
+    HOSTNAME: process.env.HOSTNAME || '0.0.0.0',
+  }
+
   console.log('Variáveis injetadas. Iniciando servidor...')
-} catch (err) {
+
+  const proc = spawn('node', ['server.js'], {
+    stdio: 'inherit',
+    env: serverEnv,
+    cwd: rootDir,
+  })
+
+  proc.on('exit', (code, signal) => {
+    process.exit(code ?? (signal ? 1 : 0))
+  })
+}
+
+main().catch((err) => {
   console.error('Erro ao injetar env:', err)
   process.exit(1)
-}
+})
