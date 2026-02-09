@@ -45,11 +45,32 @@ async function processDir(dir) {
   }
 }
 
+async function injectIntoServerJs() {
+  const serverPath = join(rootDir, 'server.js')
+  let content = await readFile(serverPath, 'utf8')
+  if (content.includes('/*__ENV_INJECT__*/')) return
+
+  const header = [
+    '/*__ENV_INJECT__*/',
+    `process.env.NEXT_PUBLIC_SUPABASE_URL = ${JSON.stringify(SUPABASE_URL)};`,
+    `process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = ${JSON.stringify(SUPABASE_ANON)};`,
+    `process.env.NEXT_PUBLIC_SITE_URL = ${JSON.stringify(SITE_URL || SUPABASE_URL)};`,
+    `process.env.SUPABASE_SERVICE_ROLE_KEY = ${JSON.stringify(SERVICE_ROLE)};`,
+    '',
+  ].join('\n')
+
+  content = `${header}\n${content}`
+  await writeFile(serverPath, content)
+}
+
 async function main() {
   console.log('Injectando variáveis de ambiente...')
 
   // 1. Substitui placeholders nos arquivos .next (client bundle)
   await processDir(join(rootDir, '.next'))
+
+  // 1.1 Garante env diretamente no server.js (standalone)
+  await injectIntoServerJs()
 
   // 1.1 Substitui placeholders no server.js (standalone)
   try {
