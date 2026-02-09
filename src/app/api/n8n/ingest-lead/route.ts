@@ -7,9 +7,14 @@ const IngestLeadSchema = z.object({
   title: z.string().min(1).max(500),
   email: z.string().email().optional().or(z.literal('')),
   phone: z.string().optional(),
+  phone_country_code: z.string().optional(),
   whatsapp: z.string().optional(),
   website: z.string().url().optional().or(z.literal('')),
   source: z.string().default('scrapping n8n'),
+  notes: z.string().optional(),
+  nacionalidade: z.string().optional(),
+  resumo: z.string().optional(),
+  valor: z.number().optional().or(z.string().transform((v) => v ? parseFloat(v) : undefined)),
   tags: z.array(z.string()).optional().default([]),
 })
 
@@ -134,9 +139,14 @@ export async function POST(request: NextRequest) {
       title: data.title,
       email: data.email || null,
       phone: data.phone || null,
+      phone_country_code: data.phone ? (data.phone_country_code || '32') : null,
       whatsapp: data.whatsapp || null,
       website: data.website || null,
       source: data.source,
+      notes: data.notes || null,
+      nacionalidade: data.nacionalidade || null,
+      resumo: data.resumo || null,
+      valor: data.valor || null,
       position: 0,
     })
     .select()
