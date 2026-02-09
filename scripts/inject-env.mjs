@@ -51,18 +51,7 @@ async function main() {
   // 1. Substitui placeholders nos arquivos .next (client bundle)
   await processDir(join(rootDir, '.next'))
 
-  // 2. Cria .env.production.local para Next.js carregar no startup
-  const envContent = [
-    `NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL}`,
-    `NEXT_PUBLIC_SUPABASE_ANON_KEY=${SUPABASE_ANON}`,
-    `NEXT_PUBLIC_SITE_URL=${SITE_URL || SUPABASE_URL}`,
-    `SUPABASE_SERVICE_ROLE_KEY=${SERVICE_ROLE || ''}`,
-    ...(process.env.N8N_INGEST_TOKEN ? [`N8N_INGEST_TOKEN=${process.env.N8N_INGEST_TOKEN}`] : []),
-    ...(process.env.N8N_DEDUPE_FIELD ? [`N8N_DEDUPE_FIELD=${process.env.N8N_DEDUPE_FIELD}`] : []),
-  ].join('\n')
-  await writeFile(join(rootDir, '.env.production.local'), envContent)
-
-  // 3. Inicia o servidor passando env explicitamente (garante que o Easypanel não perca as vars)
+  // 2. Inicia o servidor passando env explicitamente (Easypanel não repassa ao processo filho)
   const serverEnv = {
     ...process.env,
     NEXT_PUBLIC_SUPABASE_URL: SUPABASE_URL,
