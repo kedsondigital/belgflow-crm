@@ -1,0 +1,50 @@
+// Códigos de país (DDI) para telefone/WhatsApp - Bélgica (+32) como padrão
+export const COUNTRY_CODES = [
+  { code: '32', country: 'Bélgica', flag: '🇧🇪' },
+  { code: '55', country: 'Brasil', flag: '🇧🇷' },
+  { code: '1', country: 'EUA/Canadá', flag: '🇺🇸' },
+  { code: '351', country: 'Portugal', flag: '🇵🇹' },
+  { code: '34', country: 'Espanha', flag: '🇪🇸' },
+  { code: '33', country: 'França', flag: '🇫🇷' },
+  { code: '49', country: 'Alemanha', flag: '🇩🇪' },
+  { code: '39', country: 'Itália', flag: '🇮🇹' },
+  { code: '44', country: 'Reino Unido', flag: '🇬🇧' },
+  { code: '52', country: 'México', flag: '🇲🇽' },
+  { code: '54', country: 'Argentina', flag: '🇦🇷' },
+  { code: '56', country: 'Chile', flag: '🇨🇱' },
+  { code: '57', country: 'Colômbia', flag: '🇨🇴' },
+  { code: '58', country: 'Venezuela', flag: '🇻🇪' },
+  { code: '51', country: 'Peru', flag: '🇵🇪' },
+  { code: '595', country: 'Paraguai', flag: '🇵🇾' },
+  { code: '598', country: 'Uruguai', flag: '🇺🇾' },
+  { code: '31', country: 'Holanda', flag: '🇳🇱' },
+  { code: '86', country: 'China', flag: '🇨🇳' },
+  { code: '81', country: 'Japão', flag: '🇯🇵' },
+  { code: '91', country: 'Índia', flag: '🇮🇳' },
+  { code: '7', country: 'Rússia', flag: '🇷🇺' },
+  { code: '61', country: 'Austrália', flag: '🇦🇺' },
+  { code: '27', country: 'África do Sul', flag: '🇿🇦' },
+  { code: '234', country: 'Nigéria', flag: '🇳🇬' },
+  { code: '971', country: 'EAU', flag: '🇦🇪' },
+  { code: '353', country: 'Irlanda', flag: '🇮🇪' },
+  { code: '43', country: 'Áustria', flag: '🇦🇹' },
+  { code: '41', country: 'Suíça', flag: '🇨🇭' },
+  { code: '48', country: 'Polônia', flag: '🇵🇱' },
+  { code: '46', country: 'Suécia', flag: '🇸🇪' },
+  { code: '47', country: 'Noruega', flag: '🇳🇴' },
+  { code: '45', country: 'Dinamarca', flag: '🇩🇰' },
+  { code: '358', country: 'Finlândia', flag: '🇫🇮' },
+  { code: '30', country: 'Grécia', flag: '🇬🇷' },
+  { code: '90', country: 'Turquia', flag: '🇹🇷' },
+  { code: '62', country: 'Indonésia', flag: '🇮🇩' },
+  { code: '65', country: 'Singapura', flag: '🇸🇬' },
+  { code: '60', country: 'Malásia', flag: '🇲🇾' },
+  { code: '66', country: 'Tailândia', flag: '🇹🇭' },
+  { code: '84', country: 'Vietnã', flag: '🇻🇳' },
+] as const
+
+export function getWhatsAppLink(countryCode: string, phone: string): string {
+  const digits = (countryCode + phone).replace(/\D/g, '')
+  if (!digits) return '#'
+  return `https://wa.me/${digits}`
+}
