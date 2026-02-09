@@ -1,1 +1,0 @@
-"use strict";exports.id=975,exports.ids=[975],exports.modules={1975:(e,s,r)=>{r.r(s),r.d(s,{LeadsTable:()=>t});let t=(0,r(8570).createProxy)(String.raw`D:\CRM Belgiflow\belgflow-crm\src\components\leads-table.tsx#LeadsTable`)}};
