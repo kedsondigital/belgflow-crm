@@ -51,6 +51,13 @@ async function main() {
   // 1. Substitui placeholders nos arquivos .next (client bundle)
   await processDir(join(rootDir, '.next'))
 
+  // 1.1 Substitui placeholders no server.js (standalone)
+  try {
+    await replaceInFile(join(rootDir, 'server.js'))
+  } catch {
+    // ignore se não existir
+  }
+
   // 2. Cria .env.production.local (Next.js carrega automaticamente ao iniciar)
   const envContent = [
     `NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL}`,
