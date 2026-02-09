@@ -40,21 +40,56 @@ Guia passo a passo para publicar o BelgiFlow CRM no seu servidor com Easypanel.
 
 ---
 
-## Passo 4: Variáveis de ambiente
+## Passo 4: Variáveis de ambiente no Easypanel
 
-Na aba **"Environment"**, adicione:
+⚠️ **IMPORTANTE:** Configure as variáveis **antes** do deploy (são usadas durante o build).
 
-| Variável | Valor | Obrigatório |
-|----------|-------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | URL do Supabase (ex: `https://xxx.supabase.co`) | Sim |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Chave pública do Supabase | Sim |
-| `SUPABASE_SERVICE_ROLE_KEY` | Chave de service role do Supabase | Sim |
-| `NEXT_PUBLIC_SITE_URL` | URL do app (ex: `https://crm.seudominio.com`) | Sim |
-| `N8N_INGEST_TOKEN` | Token da API n8n (se usar) | Não |
-| `N8N_DEDUPE_FIELD` | Campo dedupe: `email` \| `phone` \| `website` \| `none` | Não |
+### Como preencher na aba "Environment"
 
-**Importante:** `NEXT_PUBLIC_SITE_URL` deve ser a URL final do app no Easypanel.  
-Exemplo: `https://crm.belgiflow.com` ou `https://belgiflow-xxx.easypanel.host`.
+1. No Easypanel, abra seu App **crm** e vá na aba **"Environment"** (ou **"Variáveis de ambiente"**).
+2. Clique em **"Adicionar"** ou no **+** para cada variável.
+3. Preencha **Nome** e **Valor** conforme a tabela abaixo.
+
+### Variáveis (copie do seu .env.local)
+
+Use os mesmos nomes e valores do seu `.env.local`. A única que você deve alterar é `NEXT_PUBLIC_SITE_URL`:
+
+| Nome (chave) | De onde pegar o valor | Exemplo |
+|--------------|------------------------|---------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Copie do `.env.local` | `https://belgiflow-supabase.xxx.easypanel.host` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Copie do `.env.local` | `eyJhbGciOiJIUzI1NiIsInR5cCI6...` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Copie do `.env.local` | `eyJhbGciOiJIUzI1NiIsInR5cCI6...` |
+| `NEXT_PUBLIC_SITE_URL` | **Altere:** use a URL do app no Easypanel | `https://crm.seudominio.com` ou `https://belgiflow-xxx.easypanel.host` |
+| `N8N_INGEST_TOKEN` | Copie do `.env.local` (se usar n8n) | `seu-token-secreto` |
+| `N8N_DEDUPE_FIELD` | Opcional | `email` |
+
+### Onde achar cada valor no .env.local
+
+Abra o arquivo `belgflow-crm/.env.local` no seu projeto e copie o valor que está **depois do `=`** em cada linha:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=          → copie o que vem após o =
+NEXT_PUBLIC_SUPABASE_ANON_KEY=     → copie o que vem após o =
+SUPABASE_SERVICE_ROLE_KEY=         → copie o que vem após o =
+NEXT_PUBLIC_SITE_URL=              → troque localhost pela URL real do Easypanel
+```
+
+### Exemplo de preenchimento no Easypanel
+
+Para cada linha, adicione uma variável:
+
+| Nome | Valor |
+|------|-------|
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://belgiflow-supabase.bnw7is.easypanel.host` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | *(valor longo que começa com eyJ...)* |
+| `SUPABASE_SERVICE_ROLE_KEY` | *(valor longo que começa com eyJ...)* |
+| `NEXT_PUBLIC_SITE_URL` | URL do app (ex: `https://crm.belgiflow.easypanel.host`). Se ainda não tiver domínio, use um provisório como `https://crm.seuservidor.com` e atualize depois em **Domains**. |
+
+### Ordem correta
+
+1. Adicione **todas** as variáveis na aba Environment.
+2. Clique em **Salvar**.
+3. Só depois clique em **Deploy**.
 
 ---
 
@@ -109,7 +144,16 @@ Salve as alterações.
 - Veja os logs no Easypanel
 - Confirme que `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` estão corretos
 
-### Build falha
+### Build falha com "NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY são obrigatórios"
+- As variáveis de ambiente precisam estar na aba **Environment** antes do deploy
+- **Salve** as variáveis e só depois clique em **Deploy**
+- Se o Easypanel tiver aba **"Build"** ou **"Build Arguments"**, adicione lá:
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  - `NEXT_PUBLIC_SITE_URL`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+
+### Outros erros de build
 - Verifique se o Dockerfile está na raiz
 - Confirme que `npm run build` roda localmente sem erro
 
