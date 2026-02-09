@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
  * Injeta variáveis de ambiente e inicia o servidor.
- * O Easypanel passa as vars para este script; repassamos explicitamente ao Node para garantir.
+ * Usa um script shell para garantir que as vars cheguem ao processo Node.
  */
 
 import { readdir, readFile, writeFile } from 'fs/promises'
-import { spawn } from 'child_process'
+import { execSync } from 'child_process'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -15,11 +15,15 @@ const rootDir = join(__dirname, '..')
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || SUPABASE_URL
-const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY
+const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 
 if (!SUPABASE_URL || !SUPABASE_ANON) {
   console.error('Erro: NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY devem estar definidos no Easypanel (aba Environment)')
   process.exit(1)
+}
+
+function escapeSh(val) {
+  return String(val).replace(/'/g, "'\"'\"'")
 }
 
 async function replaceInFile(filePath) {
@@ -51,28 +55,26 @@ async function main() {
   // 1. Substitui placeholders nos arquivos .next (client bundle)
   await processDir(join(rootDir, '.next'))
 
-  // 2. Inicia o servidor passando env explicitamente (Easypanel não repassa ao processo filho)
-  const serverEnv = {
-    ...process.env,
-    NEXT_PUBLIC_SUPABASE_URL: SUPABASE_URL,
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: SUPABASE_ANON,
-    NEXT_PUBLIC_SITE_URL: SITE_URL || SUPABASE_URL,
-    SUPABASE_SERVICE_ROLE_KEY: SERVICE_ROLE || '',
-    NODE_ENV: 'production',
-    PORT: process.env.PORT || '3000',
-    HOSTNAME: process.env.HOSTNAME || '0.0.0.0',
-  }
+  // 2. Escreve script shell em .next/ ( temos permissão) que exporta vars e inicia o servidor
+  const runSh = `#!/bin/sh
+export NEXT_PUBLIC_SUPABASE_URL='${escapeSh(SUPABASE_URL)}'
+export NEXT_PUBLIC_SUPABASE_ANON_KEY='${escapeSh(SUPABASE_ANON)}'
+export NEXT_PUBLIC_SITE_URL='${escapeSh(SITE_URL || SUPABASE_URL)}'
+export SUPABASE_SERVICE_ROLE_KEY='${escapeSh(SERVICE_ROLE)}'
+export NODE_ENV=production
+export PORT="${process.env.PORT || '3000'}"
+export HOSTNAME="${process.env.HOSTNAME || '0.0.0.0'}"
+exec node server.js
+`
+  const runShPath = join(rootDir, '.next', 'run-server.sh')
+  await writeFile(runShPath, runSh, { mode: 0o755 })
 
   console.log('Variáveis injetadas. Iniciando servidor...')
 
-  const proc = spawn('node', ['server.js'], {
+  execSync('sh .next/run-server.sh', {
     stdio: 'inherit',
-    env: serverEnv,
     cwd: rootDir,
-  })
-
-  proc.on('exit', (code, signal) => {
-    process.exit(code ?? (signal ? 1 : 0))
+    env: { ...process.env, PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin' },
   })
 }
 
