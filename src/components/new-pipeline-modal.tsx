@@ -58,13 +58,29 @@ export function NewPipelineModal({
 
       if (pipelineError) throw pipelineError
 
+      // Busca todos os admins do sistema para adicionar ao pipeline
+      const { data: admins } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('role_global', 'ADMIN')
+
+      // Adiciona o criador e todos os admins como membros do pipeline
+      const membersToAdd = new Set<string>()
+      membersToAdd.add(user.id) // Criador sempre é adicionado
+      
+      if (admins) {
+        admins.forEach((admin) => membersToAdd.add(admin.id))
+      }
+
       const { error: membersError } = await supabase
         .from('pipeline_members')
-        .insert({
-          pipeline_id: pipeline.id,
-          user_id: user.id,
-          role_in_pipeline: 'admin',
-        })
+        .insert(
+          Array.from(membersToAdd).map((userId) => ({
+            pipeline_id: pipeline.id,
+            user_id: userId,
+            role_in_pipeline: 'admin',
+          }))
+        )
 
       if (membersError) throw membersError
 

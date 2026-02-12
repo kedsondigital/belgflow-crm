@@ -23,7 +23,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { Plus } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import { AddUserModal } from '@/components/add-user-modal'
 import { toast } from 'sonner'
 
@@ -47,6 +47,7 @@ export function AdminUsersContent({
 }: AdminUsersContentProps) {
   const router = useRouter()
   const [editingUser, setEditingUser] = useState<string | null>(null)
+  const [deletingUser, setDeletingUser] = useState<{ id: string; name: string | null; email: string } | null>(null)
   const [addUserOpen, setAddUserOpen] = useState(false)
   const [userPipelineAccess, setUserPipelineAccess] = useState<
     Record<string, string[]>
@@ -110,6 +111,33 @@ export function AdminUsersContent({
 
   const handleToggleAdmin = async (userId: string, isAdmin: boolean) => {
     const supabase = createClient()
+    
+    if (!isAdmin) {
+      // Está tornando admin: adiciona acesso a todos os pipelines
+      // Remove membros existentes para evitar duplicatas
+      await supabase
+        .from('pipeline_members')
+        .delete()
+        .eq('user_id', userId)
+
+      // Adiciona como admin em todos os pipelines
+      if (pipelines.length > 0) {
+        await supabase.from('pipeline_members').insert(
+          pipelines.map((pipeline) => ({
+            pipeline_id: pipeline.id,
+            user_id: userId,
+            role_in_pipeline: 'admin',
+          }))
+        )
+      }
+    } else {
+      // Está removendo admin: remove acesso a todos os pipelines
+      await supabase
+        .from('pipeline_members')
+        .delete()
+        .eq('user_id', userId)
+    }
+
     const { error } = await supabase
       .from('profiles')
       .update({ role_global: isAdmin ? 'MEMBER' : 'ADMIN' })
@@ -118,7 +146,7 @@ export function AdminUsersContent({
     if (error) {
       toast.error('Erro ao alterar permissão')
     } else {
-      toast.success('Permissão atualizada')
+      toast.success(isAdmin ? 'Permissão de Admin removida e acessos aos pipelines revogados' : 'Usuário agora é Admin com acesso completo a todos os pipelines')
       router.refresh()
     }
   }
@@ -135,6 +163,36 @@ export function AdminUsersContent({
     } else {
       toast.success('Status atualizado')
       router.refresh()
+    }
+  }
+
+  const handleDeleteUser = async () => {
+    if (!deletingUser) return
+    setLoading(true)
+    const supabase = createClient()
+
+    try {
+      // Remove o usuário de todos os pipelines
+      await supabase
+        .from('pipeline_members')
+        .delete()
+        .eq('user_id', deletingUser.id)
+
+      // Remove o perfil do usuário
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', deletingUser.id)
+
+      if (error) throw error
+
+      toast.success('Usuário removido com sucesso')
+      setDeletingUser(null)
+      router.refresh()
+    } catch {
+      toast.error('Erro ao remover usuário')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -204,7 +262,7 @@ export function AdminUsersContent({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleToggleAdmin(u.id, true)}
+                        onClick={() => handleToggleAdmin(u.id, false)}
                       >
                         Tornar Admin
                       </Button>
@@ -213,7 +271,7 @@ export function AdminUsersContent({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleToggleAdmin(u.id, false)}
+                        onClick={() => handleToggleAdmin(u.id, true)}
                       >
                         Remover Admin
                       </Button>
@@ -225,6 +283,15 @@ export function AdminUsersContent({
                     >
                       {u.is_active ? 'Desativar' : 'Ativar'}
                     </Button>
+                    {users.filter((x) => x.role_global === 'ADMIN').length > 1 || u.role_global !== 'ADMIN' ? (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => setDeletingUser({ id: u.id, name: u.name, email: u.email })}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    ) : null}
                   </div>
                 </TableCell>
               </TableRow>
@@ -268,6 +335,27 @@ export function AdminUsersContent({
             </Button>
             <Button onClick={handleSaveAccess} disabled={loading}>
               Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deletingUser} onOpenChange={() => setDeletingUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remover Usuário</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja remover o usuário{' '}
+              <strong>{deletingUser?.name || deletingUser?.email}</strong>?
+              Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletingUser(null)} disabled={loading}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteUser} disabled={loading}>
+              {loading ? 'Removendo...' : 'Remover'}
             </Button>
           </DialogFooter>
         </DialogContent>
