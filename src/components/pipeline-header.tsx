@@ -28,6 +28,7 @@ interface PipelineHeaderProps {
   members?: Member[]
   assigneeFilter?: string
   onAssigneeFilterChange?: (value: string) => void
+  isAdmin?: boolean
 }
 
 export function PipelineHeader({
@@ -38,6 +39,7 @@ export function PipelineHeader({
   members = [],
   assigneeFilter = '__all__',
   onAssigneeFilterChange,
+  isAdmin = false,
 }: PipelineHeaderProps) {
   const router = useRouter()
   const [modalOpen, setModalOpen] = useState(false)
@@ -66,10 +68,12 @@ export function PipelineHeader({
             ))}
           </SelectContent>
         </Select>
-        <Button variant="outline" size="sm" onClick={() => setModalOpen(true)}>
-          <Plus className="mr-2 size-4" />
-          Novo pipeline
-        </Button>
+        {isAdmin && (
+          <Button variant="outline" size="sm" onClick={() => setModalOpen(true)}>
+            <Plus className="mr-2 size-4" />
+            Novo pipeline
+          </Button>
+        )}
         {stages.length > 0 && (
           <Button size="sm" onClick={() => setAddLeadOpen(true)}>
             <Plus className="mr-2 size-4" />

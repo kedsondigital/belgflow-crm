@@ -54,13 +54,11 @@ export function AppSidebar({ profile }: AppSidebarProps) {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/pipelines">
-                <div className="bg-primary text-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg font-semibold">
-                  B
-                </div>
-                <div className="flex flex-col gap-0.5 leading-none">
-                  <span className="font-semibold">BelgiFlow CRM</span>
-                  <span className="text-xs text-muted-foreground">Gestão de Leads</span>
-                </div>
+                <img 
+                  src="/lg-belgiflow.png" 
+                  alt="BelgiFlow" 
+                  className="h-8 w-auto"
+                />
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

@@ -91,7 +91,7 @@ export function LoginForm() {
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
             <img 
-              src="/Logo BelgiFlow.png" 
+              src="/logo-belgiflow.png" 
               alt="BelgiFlow Logo" 
               className="h-24 w-auto"
             />

@@ -23,7 +23,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Key } from 'lucide-react'
+import { Input } from '@/components/ui/input'
 import { AddUserModal } from '@/components/add-user-modal'
 import { toast } from 'sonner'
 
@@ -48,6 +49,9 @@ export function AdminUsersContent({
   const router = useRouter()
   const [editingUser, setEditingUser] = useState<string | null>(null)
   const [deletingUser, setDeletingUser] = useState<{ id: string; name: string | null; email: string } | null>(null)
+  const [passwordUser, setPasswordUser] = useState<{ id: string; name: string | null; email: string } | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [addUserOpen, setAddUserOpen] = useState(false)
   const [userPipelineAccess, setUserPipelineAccess] = useState<
     Record<string, string[]>
@@ -169,31 +173,73 @@ export function AdminUsersContent({
   const handleDeleteUser = async () => {
     if (!deletingUser) return
     setLoading(true)
-    const supabase = createClient()
 
     try {
-      // Remove o usuário de todos os pipelines
-      await supabase
-        .from('pipeline_members')
-        .delete()
-        .eq('user_id', deletingUser.id)
+      const response = await fetch('/api/admin/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: deletingUser.id }),
+      })
 
-      // Remove o perfil do usuário
-      const { error } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', deletingUser.id)
+      const data = await response.json()
 
-      if (error) throw error
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao remover usuário')
+      }
 
       toast.success('Usuário removido com sucesso')
       setDeletingUser(null)
       router.refresh()
-    } catch {
-      toast.error('Erro ao remover usuário')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erro ao remover usuário')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleResetPassword = async () => {
+    if (!passwordUser) return
+
+    if (newPassword.length < 6) {
+      toast.error('A senha deve ter pelo menos 6 caracteres')
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error('As senhas não coincidem')
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      const response = await fetch('/api/admin/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: passwordUser.id, newPassword }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao alterar senha')
+      }
+
+      toast.success('Senha alterada com sucesso')
+      setPasswordUser(null)
+      setNewPassword('')
+      setConfirmPassword('')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erro ao alterar senha')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleClosePasswordModal = () => {
+    setPasswordUser(null)
+    setNewPassword('')
+    setConfirmPassword('')
   }
 
   return (
@@ -283,6 +329,14 @@ export function AdminUsersContent({
                     >
                       {u.is_active ? 'Desativar' : 'Ativar'}
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPasswordUser({ id: u.id, name: u.name, email: u.email })}
+                      title="Definir senha"
+                    >
+                      <Key className="size-4" />
+                    </Button>
                     {users.filter((x) => x.role_global === 'ADMIN').length > 1 || u.role_global !== 'ADMIN' ? (
                       <Button
                         variant="destructive"
@@ -356,6 +410,53 @@ export function AdminUsersContent({
             </Button>
             <Button variant="destructive" onClick={handleDeleteUser} disabled={loading}>
               {loading ? 'Removendo...' : 'Remover'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!passwordUser} onOpenChange={handleClosePasswordModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Definir Senha</DialogTitle>
+            <DialogDescription>
+              Defina uma nova senha para{' '}
+              <strong>{passwordUser?.name || passwordUser?.email}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="new-password">Nova Senha</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Mínimo 6 caracteres"
+                disabled={loading}
+              />
+            </div>
+            <div>
+              <Label htmlFor="confirm-password">Confirmar Senha</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Repita a senha"
+                disabled={loading}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleClosePasswordModal} disabled={loading}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleResetPassword} 
+              disabled={loading || !newPassword || !confirmPassword}
+            >
+              {loading ? 'Salvando...' : 'Salvar Senha'}
             </Button>
           </DialogFooter>
         </DialogContent>

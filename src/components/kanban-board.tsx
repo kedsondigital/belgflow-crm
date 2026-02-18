@@ -44,12 +44,14 @@ interface KanbanBoardProps {
   pipelineName?: string
   stages: StageWithLeads[]
   members: Member[]
+  isAdmin?: boolean
 }
 
 export function KanbanBoard({
   pipelineId,
   stages: initialStages,
   members,
+  isAdmin = false,
 }: KanbanBoardProps) {
   const router = useRouter()
   const [stages, setStages] = useState(initialStages)
@@ -291,19 +293,21 @@ export function KanbanBoard({
             pipelineId={pipelineId}
             onEditStage={handleEditStage}
             onDeleteStage={handleDeleteStage}
-            canEditStages
+            canEditStages={isAdmin}
           />
         ))}
-        <div className="flex w-72 shrink-0 flex-col items-center justify-center rounded-lg border border-dashed">
-          <Button
-            variant="ghost"
-            className="text-muted-foreground"
-            onClick={() => setAddStageOpen(true)}
-          >
-            <Plus className="mr-2 size-4" />
-            Adicionar estágio
-          </Button>
-        </div>
+        {isAdmin && (
+          <div className="flex w-72 shrink-0 flex-col items-center justify-center rounded-lg border border-dashed">
+            <Button
+              variant="ghost"
+              className="text-muted-foreground"
+              onClick={() => setAddStageOpen(true)}
+            >
+              <Plus className="mr-2 size-4" />
+              Adicionar estágio
+            </Button>
+          </div>
+        )}
       </div>
 
       <DragOverlay dropAnimation={{ duration: 200, easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)' }}>

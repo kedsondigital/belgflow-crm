@@ -28,6 +28,7 @@ interface PipelineViewProps {
   stagesWithLeads: StageWithLeads[]
   members: Member[]
   description?: string | null
+  isAdmin?: boolean
 }
 
 export function PipelineView({
@@ -36,6 +37,7 @@ export function PipelineView({
   stagesWithLeads,
   members,
   description,
+  isAdmin = false,
 }: PipelineViewProps) {
   const [assigneeFilter, setAssigneeFilter] = useState<string>('__all__')
 
@@ -62,6 +64,7 @@ export function PipelineView({
         members={members}
         assigneeFilter={assigneeFilter}
         onAssigneeFilterChange={setAssigneeFilter}
+        isAdmin={isAdmin}
       />
       {description && (
         <p className="text-muted-foreground mb-2 text-sm">{description}</p>
@@ -70,6 +73,7 @@ export function PipelineView({
         pipelineId={pipelineId}
         stages={filteredStages}
         members={members}
+        isAdmin={isAdmin}
       />
     </>
   )
