@@ -59,11 +59,11 @@ export default async function PipelinePage({
 
     userPipelines = (memberPipelines || [])
       .filter((m) => {
-        const p = m.pipelines as { id: string; name: string; is_archived: boolean } | null
+        const p = m.pipelines as unknown as { id: string; name: string; is_archived: boolean } | null
         return p && !p.is_archived
       })
       .map((m) => {
-        const p = m.pipelines as { id: string; name: string }
+        const p = m.pipelines as unknown as { id: string; name: string }
         return { id: p.id, name: p.name }
       })
   }
