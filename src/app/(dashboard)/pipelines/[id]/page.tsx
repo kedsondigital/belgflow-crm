@@ -68,12 +68,13 @@ export default async function PipelinePage({
       })
   }
 
-  const [pipelineRes, stagesRes, leadsRes, membersRes] =
+  const [pipelineRes, stagesRes, leadsRes, membersRes, adminsRes] =
     await Promise.all([
       supabase.from('pipelines').select('id, name, description, is_archived').eq('id', id).single(),
       supabase.from('stages').select('*').eq('pipeline_id', id).order('position', { ascending: true }),
       supabase.from('leads').select(`*, lead_tags(tag), profiles:assignee_user_id(id, name, email)`).eq('pipeline_id', id).order('position', { ascending: true }),
-      supabase.from('pipeline_members').select('user_id, profiles(id, name, email, role_global)').eq('pipeline_id', id),
+      supabase.from('pipeline_members').select('user_id, profiles(id, name, email)').eq('pipeline_id', id),
+      supabase.from('profiles').select('id, name, email').eq('role_global', 'ADMIN'),
     ])
 
   const pipeline = pipelineRes.data
@@ -88,18 +89,26 @@ export default async function PipelinePage({
     leads: leads.filter((l) => l.stage_id === stage.id),
   }))
 
-  const membersMapped = members
-    .map((m) => {
-      const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
-      return {
-        id: m.user_id,
-        name: (p as { name?: string })?.name || '',
-        email: (p as { email?: string })?.email || '',
-        role_global: (p as { role_global?: string })?.role_global,
-      }
-    })
-    .filter((m) => m.role_global !== 'ADMIN')
-    .map(({ id, name, email }) => ({ id, name, email }))
+  const membersMapped = members.map((m) => {
+    const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles
+    return {
+      id: m.user_id,
+      name: (p as { name?: string })?.name || '',
+      email: (p as { email?: string })?.email || '',
+    }
+  })
+
+  const adminsMapped = (adminsRes.data || []).map((p) => ({
+    id: p.id,
+    name: p.name || '',
+    email: p.email || '',
+  }))
+
+  const memberIds = new Set(membersMapped.map((m) => m.id))
+  const membersMappedAll = [
+    ...membersMapped,
+    ...adminsMapped.filter((a) => !memberIds.has(a.id)),
+  ]
 
   return (
     <div className="flex h-[calc(100vh-8rem)] flex-col">
@@ -108,7 +117,7 @@ export default async function PipelinePage({
         pipelineId={pipeline.id}
         pipelines={userPipelines}
         stagesWithLeads={stagesWithLeads}
-        members={membersMapped}
+        members={membersMappedAll}
         description={pipeline.description}
         isAdmin={isAdmin}
       />
