@@ -107,10 +107,12 @@ export function LeadDrawer({
         setLead(leadData)
         const pcCode = (leadData.phone_country_code as string) || '32'
         const wapp = String(leadData.whatsapp || '').replace(/\D/g, '')
-        const ph = (leadData.phone as string) || ''
+        const ph = (leadData.phone as string)?.replace(/\D/g, '') || ''
+        const code = pcCode.replace(/\D/g, '')
         let numPart = ph
-        if (wapp && !ph) {
-          const code = pcCode.replace(/\D/g, '')
+        if (ph && ph.startsWith(code)) {
+          numPart = ph.slice(code.length)
+        } else if (wapp && !ph) {
           numPart = wapp.startsWith(code) ? wapp.slice(code.length) : wapp
         }
         setFormData({
@@ -575,30 +577,37 @@ export function LeadDrawer({
                       </a>
                     </div>
                   )}
-                  {(formData.phone || formData.whatsapp) && (
-                    <div className="flex items-center gap-2">
-                      <Phone className="size-4 text-muted-foreground" />
-                      <span className="text-sm">
-                        +{formData.phone_country_code} {formData.phone || formData.whatsapp}
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        asChild
-                      >
-                        <a
-                          href={formData.phone
-                            ? getWhatsAppLink(formData.phone_country_code, formData.phone)
-                            : `https://wa.me/${(formData.whatsapp || '').replace(/\D/g, '')}`
-                          }
-                          target="_blank"
-                          rel="noopener noreferrer"
+                  {(formData.phone || formData.whatsapp) && (() => {
+                    const wDigits = (formData.whatsapp || '').replace(/\D/g, '')
+                    const code = formData.phone_country_code.replace(/\D/g, '')
+                    const displayNumber = formData.phone
+                      ? formData.phone
+                      : wDigits.startsWith(code) ? wDigits.slice(code.length) : wDigits
+                    const waLink = formData.phone
+                      ? getWhatsAppLink(formData.phone_country_code, formData.phone)
+                      : `https://wa.me/${wDigits}`
+                    return (
+                      <div className="flex items-center gap-2">
+                        <Phone className="size-4 text-muted-foreground" />
+                        <span className="text-sm">
+                          +{formData.phone_country_code} {displayNumber}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          asChild
                         >
-                          Entrar em contato (WhatsApp)
-                        </a>
-                      </Button>
-                    </div>
-                  )}
+                          <a
+                            href={waLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Entrar em contato (WhatsApp)
+                          </a>
+                        </Button>
+                      </div>
+                    )
+                  })()}
                   {formData.website && (
                     <div className="flex items-center gap-2">
                       <Globe className="size-4 text-muted-foreground" />
