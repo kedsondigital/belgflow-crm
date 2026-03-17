@@ -10,9 +10,8 @@ export const config = {
     /*
      * Match all request paths except:
      * - _next (static files, HMR, etc)
-     * - api routes
-     * - static files
+     * - static files (images, favicon, etc)
      */
-    '/((?!_next|api|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
+    '/((?!_next|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 }

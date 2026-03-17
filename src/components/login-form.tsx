@@ -36,11 +36,11 @@ export function LoginForm() {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
       toast.success('Login realizado com sucesso!')
-      router.push(redirectTo)
-      router.refresh()
+      // Full page navigation garante que o middleware processa os cookies
+      // antes de renderizar a página protegida (evita race condition).
+      window.location.href = redirectTo
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : 'Erro ao fazer login')
-    } finally {
       setLoading(false)
     }
   }

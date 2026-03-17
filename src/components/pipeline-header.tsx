@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus } from 'lucide-react'
+import { Plus, Download, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { toast } from 'sonner'
 import {
   Select,
   SelectContent,
@@ -44,10 +45,47 @@ export function PipelineHeader({
   const router = useRouter()
   const [modalOpen, setModalOpen] = useState(false)
   const [addLeadOpen, setAddLeadOpen] = useState(false)
+  const [extracting, setExtracting] = useState(false)
 
   const handleCreated = (pipelineId: string) => {
     router.push(`/pipelines/${pipelineId}`)
     router.refresh()
+  }
+
+  const handleExtractLeads = async () => {
+    setExtracting(true)
+    try {
+      const res = await fetch(
+        'https://belgiflow-n8n.wsn2ua.easypanel.host/webhook/isnerir-leads-manual',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pipeline_id: currentPipelineId }),
+        }
+      )
+
+      if (!res.ok) {
+        throw new Error(`Erro do webhook: ${res.status}`)
+      }
+
+      const data = await res.json()
+
+      const inserted = data.inserted ?? data.leads_inserted ?? data.total ?? null
+      if (inserted != null) {
+        toast.success(`${inserted} lead(s) extraído(s) e inserido(s) com sucesso!`)
+      } else {
+        toast.success('Extração de leads concluída!')
+      }
+
+      onLeadAdded?.()
+      router.refresh()
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Erro ao extrair leads'
+      )
+    } finally {
+      setExtracting(false)
+    }
   }
 
   return (
@@ -78,6 +116,21 @@ export function PipelineHeader({
           <Button size="sm" onClick={() => setAddLeadOpen(true)}>
             <Plus className="mr-2 size-4" />
             Adicionar lead
+          </Button>
+        )}
+        {stages.length > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleExtractLeads}
+            disabled={extracting}
+          >
+            {extracting ? (
+              <Loader2 className="mr-2 size-4 animate-spin" />
+            ) : (
+              <Download className="mr-2 size-4" />
+            )}
+            {extracting ? 'Extraindo leads...' : 'Extrair Leads'}
           </Button>
         )}
         {onAssigneeFilterChange && (

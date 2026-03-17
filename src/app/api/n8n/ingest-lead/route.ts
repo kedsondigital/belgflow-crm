@@ -16,6 +16,11 @@ const IngestLeadSchema = z.object({
   resumo: z.string().optional(),
   valor: z.number().optional().or(z.string().transform((v) => v ? parseFloat(v) : undefined)),
   tags: z.array(z.string()).optional().default([]),
+  linkedin: z.string().optional(),
+  facebook: z.string().optional(),
+  instagram: z.string().optional(),
+  nome_dono: z.string().optional(),
+  email_dono: z.string().email().optional().or(z.literal('')),
 })
 
 export async function POST(request: NextRequest) {
@@ -147,6 +152,11 @@ export async function POST(request: NextRequest) {
       nacionalidade: data.nacionalidade || null,
       resumo: data.resumo || null,
       valor: data.valor || null,
+      linkedin: data.linkedin || null,
+      facebook: data.facebook || null,
+      instagram: data.instagram || null,
+      nome_dono: data.nome_dono || null,
+      email_dono: data.email_dono || null,
       position: 0,
     })
     .select()

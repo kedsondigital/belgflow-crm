@@ -29,6 +29,11 @@ export async function POST(request: NextRequest) {
       valor,
       source,
       position,
+      linkedin,
+      facebook,
+      instagram,
+      nome_dono,
+      email_dono,
     } = body
 
     if (!pipeline_id || !stage_id || !title) {
@@ -55,6 +60,11 @@ export async function POST(request: NextRequest) {
       resumo: resumo?.trim() || null,
       nacionalidade: nacionalidade && nacionalidade !== '__none__' ? nacionalidade : null,
       valor: valor != null && !Number.isNaN(Number(valor)) ? Number(valor) : null,
+      linkedin: linkedin?.trim() || null,
+      facebook: facebook?.trim() || null,
+      instagram: instagram?.trim() || null,
+      nome_dono: nome_dono?.trim() || null,
+      email_dono: email_dono?.trim() || null,
     }
 
     const { data: lead, error } = await supabase

@@ -35,6 +35,11 @@ export async function PATCH(request: NextRequest) {
       resumo: fields.resumo || null,
       nacionalidade: fields.nacionalidade && fields.nacionalidade !== '__none__' ? fields.nacionalidade : null,
       valor: fields.valor != null && !Number.isNaN(Number(fields.valor)) ? Number(fields.valor) : null,
+      linkedin: fields.linkedin || null,
+      facebook: fields.facebook || null,
+      instagram: fields.instagram || null,
+      nome_dono: fields.nome_dono || null,
+      email_dono: fields.email_dono || null,
     }
 
     const { error } = await supabase

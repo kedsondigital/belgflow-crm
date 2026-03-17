@@ -57,6 +57,11 @@ export interface Lead {
   position: number
   created_at: string
   updated_at: string
+  linkedin: string | null
+  facebook: string | null
+  instagram: string | null
+  nome_dono: string | null
+  email_dono: string | null
 }
 
 export interface LeadTag {

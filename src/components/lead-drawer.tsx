@@ -23,7 +23,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Mail, Phone, Globe, MessageSquare, Plus, Pencil, Trash2 } from 'lucide-react'
+import { Mail, Phone, Globe, MessageSquare, Plus, Pencil, Trash2, Linkedin, Facebook, Instagram } from 'lucide-react'
 import { toast } from 'sonner'
 import { getErrorMessage, formatCurrency } from '@/lib/utils'
 import { PhoneInput } from '@/components/phone-input'
@@ -31,10 +31,6 @@ import { AddTaskModal } from '@/components/add-task-modal'
 import { EditTaskModal } from '@/components/edit-task-modal'
 import { getWhatsAppLink } from '@/lib/country-codes'
 
-const NACIONALIDADES = [
-  'Brasil', 'Portugal', 'Espanha', 'Argentina', 'EUA', 'Reino Unido',
-  'França', 'Alemanha', 'Itália', 'México', 'Chile', 'Colômbia', 'Outro',
-]
 
 interface LeadDrawerProps {
   leadId: string
@@ -73,6 +69,11 @@ export function LeadDrawer({
     resumo: '',
     nacionalidade: '',
     valor: '',
+    linkedin: '',
+    facebook: '',
+    instagram: '',
+    nome_dono: '',
+    email_dono: '',
   })
   const [addTaskOpen, setAddTaskOpen] = useState(false)
   const [editTaskOpen, setEditTaskOpen] = useState(false)
@@ -125,6 +126,11 @@ export function LeadDrawer({
           resumo: (leadData.resumo as string) || '',
           nacionalidade: (leadData.nacionalidade as string) || '',
           valor: (leadData.valor as number) != null ? String(leadData.valor) : '',
+          linkedin: (leadData.linkedin as string) || '',
+          facebook: (leadData.facebook as string) || '',
+          instagram: (leadData.instagram as string) || '',
+          nome_dono: (leadData.nome_dono as string) || '',
+          email_dono: (leadData.email_dono as string) || '',
         })
       }
 
@@ -233,8 +239,13 @@ export function LeadDrawer({
           notes: formData.notes || null,
           assignee_user_id: newAssigneeId,
           resumo: formData.resumo || null,
-          nacionalidade: formData.nacionalidade && formData.nacionalidade !== '__none__' ? formData.nacionalidade : null,
+          nacionalidade: formData.nacionalidade?.trim() || null,
           valor: valorNum,
+          linkedin: formData.linkedin || null,
+          facebook: formData.facebook || null,
+          instagram: formData.instagram || null,
+          nome_dono: formData.nome_dono || null,
+          email_dono: formData.email_dono || null,
         })
         .eq('id', leadId)
 
@@ -414,6 +425,55 @@ export function LeadDrawer({
                     />
                   </div>
                   <div>
+                    <Label>LinkedIn</Label>
+                    <Input
+                      value={formData.linkedin}
+                      onChange={(e) =>
+                        setFormData((p) => ({ ...p, linkedin: e.target.value }))
+                      }
+                      placeholder="https://linkedin.com/company/..."
+                    />
+                  </div>
+                  <div>
+                    <Label>Facebook</Label>
+                    <Input
+                      value={formData.facebook}
+                      onChange={(e) =>
+                        setFormData((p) => ({ ...p, facebook: e.target.value }))
+                      }
+                      placeholder="https://facebook.com/..."
+                    />
+                  </div>
+                  <div>
+                    <Label>Instagram</Label>
+                    <Input
+                      value={formData.instagram}
+                      onChange={(e) =>
+                        setFormData((p) => ({ ...p, instagram: e.target.value }))
+                      }
+                      placeholder="https://instagram.com/..."
+                    />
+                  </div>
+                  <div>
+                    <Label>Nome do proprietário</Label>
+                    <Input
+                      value={formData.nome_dono}
+                      onChange={(e) =>
+                        setFormData((p) => ({ ...p, nome_dono: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Email do proprietário</Label>
+                    <Input
+                      type="email"
+                      value={formData.email_dono}
+                      onChange={(e) =>
+                        setFormData((p) => ({ ...p, email_dono: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div>
                     <Label>Resumo</Label>
                     <textarea
                       className="w-full min-h-[60px] rounded-md border px-3 py-2 text-sm"
@@ -425,22 +485,13 @@ export function LeadDrawer({
                   </div>
                   <div>
                     <Label>Possível nacionalidade</Label>
-                    <Select
-                      value={formData.nacionalidade || '__none__'}
-                      onValueChange={(v) =>
-                        setFormData((p) => ({ ...p, nacionalidade: v }))
+                    <Input
+                      value={formData.nacionalidade}
+                      onChange={(e) =>
+                        setFormData((p) => ({ ...p, nacionalidade: e.target.value }))
                       }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">Nenhuma</SelectItem>
-                        {NACIONALIDADES.map((n) => (
-                          <SelectItem key={n} value={n}>{n}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      placeholder="Ex: Brasileira, Francesa, Belga..."
+                    />
                   </div>
                   <div>
                     <Label>Valor (€)</Label>
@@ -561,6 +612,41 @@ export function LeadDrawer({
                       </a>
                     </div>
                   )}
+                  {(formData.linkedin || formData.facebook || formData.instagram) && (
+                    <div className="flex items-center gap-3">
+                      {formData.linkedin && (
+                        <a href={formData.linkedin} target="_blank" rel="noopener noreferrer" title="LinkedIn">
+                          <Linkedin className="size-4 text-muted-foreground hover:text-foreground transition-colors" />
+                        </a>
+                      )}
+                      {formData.facebook && (
+                        <a href={formData.facebook} target="_blank" rel="noopener noreferrer" title="Facebook">
+                          <Facebook className="size-4 text-muted-foreground hover:text-foreground transition-colors" />
+                        </a>
+                      )}
+                      {formData.instagram && (
+                        <a href={formData.instagram} target="_blank" rel="noopener noreferrer" title="Instagram">
+                          <Instagram className="size-4 text-muted-foreground hover:text-foreground transition-colors" />
+                        </a>
+                      )}
+                    </div>
+                  )}
+                  {(formData.nome_dono || formData.email_dono) && (
+                    <div>
+                      <Label>Proprietário</Label>
+                      {formData.nome_dono && (
+                        <p className="text-sm mt-1">{formData.nome_dono}</p>
+                      )}
+                      {formData.email_dono && (
+                        <a
+                          href={`mailto:${formData.email_dono}`}
+                          className="text-sm hover:underline text-muted-foreground"
+                        >
+                          {formData.email_dono}
+                        </a>
+                      )}
+                    </div>
+                  )}
                   <div>
                     <Label>Responsável</Label>
                     <Select
@@ -586,9 +672,9 @@ export function LeadDrawer({
                       <p className="text-sm mt-1 whitespace-pre-wrap">{formData.resumo}</p>
                     </div>
                   )}
-                  {((formData.nacionalidade && formData.nacionalidade !== '__none__') || formData.valor) && (
+                  {(formData.nacionalidade || formData.valor) && (
                     <div className="flex gap-4">
-                      {formData.nacionalidade && formData.nacionalidade !== '__none__' && (
+                      {formData.nacionalidade && (
                         <div>
                           <Label>Nacionalidade</Label>
                           <p className="text-sm mt-1">{formData.nacionalidade}</p>

@@ -5,7 +5,7 @@ export async function updateSession(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-  const supabaseResponse = NextResponse.next({
+  let supabaseResponse = NextResponse.next({
     request,
   })
 
@@ -19,14 +19,27 @@ export async function updateSession(request: NextRequest) {
             return request.cookies.getAll()
           },
           setAll(cookiesToSet) {
+            // 1. Atualizar os cookies no request (para que getUser() leia a sessão atualizada)
             cookiesToSet.forEach(({ name, value }) =>
               request.cookies.set(name, value)
+            )
+
+            // 2. Recriar o response com os cookies atualizados no request
+            supabaseResponse = NextResponse.next({
+              request,
+            })
+
+            // 3. Aplicar os cookies no response (para que o navegador os receba)
+            cookiesToSet.forEach(({ name, value, options }) =>
+              supabaseResponse.cookies.set(name, value, options)
             )
           },
         },
       }
     )
 
+    // Isso dispara o refresh do token se necessário, e setAll será chamado
+    // com os novos cookies — que agora são propagados ao response.
     const {
       data: { user },
     } = await supabase.auth.getUser()
