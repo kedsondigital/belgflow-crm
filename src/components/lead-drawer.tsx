@@ -587,10 +587,10 @@ export function LeadDrawer({
                         asChild
                       >
                         <a
-                          href={getWhatsAppLink(
-                            formData.phone_country_code,
-                            formData.phone || formData.whatsapp || ''
-                          )}
+                          href={formData.phone
+                            ? getWhatsAppLink(formData.phone_country_code, formData.phone)
+                            : `https://wa.me/${(formData.whatsapp || '').replace(/\D/g, '')}`
+                          }
                           target="_blank"
                           rel="noopener noreferrer"
                         >
