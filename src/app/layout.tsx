@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import localFont from 'next/font/local'
 import { Toaster } from '@/components/ui/sonner'
 import { NextAuthProvider } from '@/components/session-provider'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import './globals.css'
 
 const geistSans = localFont({
@@ -32,6 +33,7 @@ export default function RootLayout({
           {children}
         </NextAuthProvider>
         <Toaster />
+        <SpeedInsights />
       </body>
     </html>
   )
