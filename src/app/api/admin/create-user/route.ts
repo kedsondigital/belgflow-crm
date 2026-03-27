@@ -1,26 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getSession } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+import bcrypt from 'bcryptjs'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
-  const {
-    data: { user: currentUser },
-  } = await supabase.auth.getUser()
+  const session = await getSession()
 
-  if (!currentUser) {
+  if (!session?.user) {
     return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role_global')
-    .eq('id', currentUser.id)
-    .single()
+  const profile = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { roleGlobal: true },
+  })
 
-  if (profile?.role_global !== 'ADMIN') {
+  if (profile?.roleGlobal !== 'ADMIN') {
     return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
   }
 
@@ -31,28 +28,33 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Email é obrigatório' }, { status: 400 })
   }
 
-  const admin = createAdminClient()
-
   try {
-    const { data: newUser, error } = await admin.auth.admin.createUser({
-      email: email.trim(),
-      password: password || undefined,
-      email_confirm: true,
-      user_metadata: { name: name?.trim() || null },
+    const existing = await prisma.user.findUnique({
+      where: { email: email.trim() },
     })
 
-    if (error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      )
+    if (existing) {
+      return NextResponse.json({ error: 'Email já cadastrado' }, { status: 400 })
     }
+
+    const hashedPassword = password
+      ? await bcrypt.hash(password, 12)
+      : await bcrypt.hash(Math.random().toString(36).slice(-12), 12)
+
+    const newUser = await prisma.user.create({
+      data: {
+        email: email.trim(),
+        name: name?.trim() || null,
+        password: hashedPassword,
+        roleGlobal: 'MEMBER',
+      },
+    })
 
     return NextResponse.json({
       success: true,
       user: {
-        id: newUser.user.id,
-        email: newUser.user.email,
+        id: newUser.id,
+        email: newUser.email,
       },
     })
   } catch (err) {

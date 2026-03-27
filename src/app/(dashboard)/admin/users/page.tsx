@@ -1,44 +1,48 @@
-import { createClient } from '@/lib/supabase/server'
+import { getSession } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import { AdminUsersContent } from '@/components/admin-users-content'
 
 export default async function AdminUsersPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const session = await getSession()
+  if (!session?.user) redirect('/login')
 
-  if (!user) redirect('/login')
+  const profile = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { roleGlobal: true },
+  })
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role_global')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role_global !== 'ADMIN') {
+  if (profile?.roleGlobal !== 'ADMIN') {
     redirect('/pipelines')
   }
 
-  const { data: users } = await supabase
-    .from('profiles')
-    .select('*')
-    .order('created_at', { ascending: false })
-
-  const { data: pipelines } = await supabase
-    .from('pipelines')
-    .select('id, name')
-    .eq('is_archived', false)
-
-  const { data: pipelineMembers } = await supabase
-    .from('pipeline_members')
-    .select('pipeline_id, user_id, role_in_pipeline')
+  const [users, pipelines, pipelineMembers] = await Promise.all([
+    prisma.user.findMany({ orderBy: { createdAt: 'desc' } }),
+    prisma.pipeline.findMany({
+      where: { isArchived: false },
+      select: { id: true, name: true },
+    }),
+    prisma.pipelineMember.findMany({
+      select: { pipelineId: true, userId: true, roleInPipeline: true },
+    }),
+  ])
 
   return (
     <AdminUsersContent
-      users={users || []}
-      pipelines={pipelines || []}
-      pipelineMembers={pipelineMembers || []}
+      users={users.map((u) => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role_global: u.roleGlobal,
+        is_active: u.isActive,
+        created_at: u.createdAt.toISOString(),
+      }))}
+      pipelines={pipelines}
+      pipelineMembers={pipelineMembers.map((m) => ({
+        pipeline_id: m.pipelineId,
+        user_id: m.userId,
+        role_in_pipeline: m.roleInPipeline,
+      }))}
     />
   )
 }

@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { getSession } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/app-sidebar'
 import { DashboardHeader } from '@/components/dashboard-header'
@@ -10,25 +11,33 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const session = await getSession()
 
-  if (!user) {
+  if (!session?.user) {
     redirect('/login')
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
+  const profile = await prisma.user.findUnique({
+    where: { id: session.user.id },
+  })
+
+  const profileData = profile
+    ? {
+        id: profile.id,
+        name: profile.name,
+        email: profile.email,
+        role_global: profile.roleGlobal,
+        avatar_url: profile.avatarUrl,
+        is_active: profile.isActive,
+        created_at: profile.createdAt.toISOString(),
+        updated_at: profile.updatedAt.toISOString(),
+      }
+    : null
 
   return (
     <PipelineNameProvider>
       <SidebarProvider>
-        <AppSidebar profile={profile} />
+        <AppSidebar profile={profileData} />
         <SidebarInset>
           <DashboardHeader />
           <main className="flex-1 overflow-auto p-4 md:p-6">{children}</main>

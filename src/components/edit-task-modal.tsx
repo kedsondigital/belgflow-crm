@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import {
   Dialog,
   DialogContent,
@@ -77,18 +76,19 @@ export function EditTaskModal({
     }
     setLoading(true)
     try {
-      const { error } = await createClient()
-        .from('tasks')
-        .update({
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           title: title.trim(),
           description: description.trim() || null,
           due_date: dueDate || null,
           status,
           assigned_to: assignedTo && assignedTo !== '__none__' ? assignedTo : null,
-        })
-        .eq('id', task.id)
+        }),
+      })
 
-      if (error) throw error
+      if (!res.ok) throw new Error('Erro')
 
       onOpenChange(false)
       onTaskUpdated()
@@ -100,14 +100,10 @@ export function EditTaskModal({
     }
   }
 
-  const handleClose = () => {
-    onOpenChange(false)
-  }
-
   if (!task) return null
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={() => onOpenChange(false)}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Editar tarefa</DialogTitle>
@@ -116,47 +112,23 @@ export function EditTaskModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="edit-task-title">Título *</Label>
-            <Input
-              id="edit-task-title"
-              placeholder="Ex: Ligar para o cliente"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              disabled={loading}
-            />
+            <Input id="edit-task-title" placeholder="Ex: Ligar para o cliente" value={title} onChange={(e) => setTitle(e.target.value)} required disabled={loading} />
           </div>
           <div>
             <Label htmlFor="edit-task-desc">Descrição</Label>
-            <textarea
-              id="edit-task-desc"
-              className="w-full min-h-[60px] rounded-md border px-3 py-2 text-sm"
-              placeholder="Detalhes da tarefa..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              disabled={loading}
-            />
+            <textarea id="edit-task-desc" className="w-full min-h-[60px] rounded-md border px-3 py-2 text-sm" placeholder="Detalhes da tarefa..." value={description} onChange={(e) => setDescription(e.target.value)} disabled={loading} />
           </div>
           <div>
             <Label htmlFor="edit-task-due">Data de vencimento</Label>
-            <Input
-              id="edit-task-due"
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              disabled={loading}
-            />
+            <Input id="edit-task-due" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} disabled={loading} />
           </div>
           <div>
             <Label>Status</Label>
             <Select value={status} onValueChange={setStatus} disabled={loading}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {STATUS_OPTIONS.map((s) => (
-                  <SelectItem key={s.value} value={s.value}>
-                    {s.label}
-                  </SelectItem>
+                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -164,23 +136,17 @@ export function EditTaskModal({
           <div>
             <Label>Atribuir a</Label>
             <Select value={assignedTo} onValueChange={setAssignedTo} disabled={loading}>
-              <SelectTrigger>
-                <SelectValue placeholder="Ninguém" />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Ninguém" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">Ninguém</SelectItem>
                 {members.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.name || m.email}
-                  </SelectItem>
+                  <SelectItem key={m.id} value={m.id}>{m.name || m.email}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleClose}>
-              Cancelar
-            </Button>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
             <Button type="submit" disabled={loading || !title.trim()}>
               {loading ? 'Salvando...' : 'Salvar'}
             </Button>

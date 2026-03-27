@@ -1,6 +1,7 @@
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
+import { getSession } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+import bcrypt from 'bcryptjs'
 
 export async function POST(request: Request) {
   try {
@@ -14,35 +15,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'A senha deve ter pelo menos 6 caracteres' }, { status: 400 })
     }
 
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const session = await getSession()
 
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
 
-    // Verifica se o usuário atual é admin
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role_global')
-      .eq('id', user.id)
-      .single()
+    const profile = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { roleGlobal: true },
+    })
 
-    if (profile?.role_global !== 'ADMIN') {
+    if (profile?.roleGlobal !== 'ADMIN') {
       return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
     }
 
-    const adminClient = createAdminClient()
+    const hashedPassword = await bcrypt.hash(newPassword, 12)
 
-    // Atualiza a senha do usuário usando o admin client
-    const { error } = await adminClient.auth.admin.updateUserById(userId, {
-      password: newPassword,
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
     })
-
-    if (error) {
-      console.error('Erro ao alterar senha:', error)
-      return NextResponse.json({ error: 'Erro ao alterar senha do usuário' }, { status: 500 })
-    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

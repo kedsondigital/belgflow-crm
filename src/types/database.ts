@@ -8,7 +8,7 @@ export interface Profile {
   id: string
   name: string | null
   email: string
-  role_global: RoleGlobal
+  role_global: string
   avatar_url: string | null
   is_active: boolean
   created_at: string
@@ -29,7 +29,7 @@ export interface PipelineMember {
   id: string
   pipeline_id: string
   user_id: string
-  role_in_pipeline: PipelineRole
+  role_in_pipeline: string
   created_at: string
 }
 
@@ -53,7 +53,7 @@ export interface Lead {
   source: string
   assignee_user_id: string | null
   notes: string | null
-  outcome: LeadOutcome
+  outcome: string
   position: number
   created_at: string
   updated_at: string
@@ -74,7 +74,7 @@ export interface LeadTag {
 export interface LeadActivity {
   id: string
   lead_id: string
-  type: ActivityType
+  type: string
   payload: Record<string, unknown> | null
   created_at: string
   created_by: string | null
@@ -86,7 +86,7 @@ export interface Task {
   title: string
   description: string | null
   due_date: string | null
-  status: TaskStatus
+  status: string
   assigned_to: string | null
   created_at: string
   updated_at: string

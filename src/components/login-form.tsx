@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { signIn } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -24,66 +24,29 @@ export function LoginForm() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [resetSent, setResetSent] = useState(false)
-
-  const supabase = createClient()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) throw error
-      toast.success('Login realizado com sucesso!')
-      // Full page navigation garante que o middleware processa os cookies
-      // antes de renderizar a página protegida (evita race condition).
-      window.location.href = redirectTo
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : 'Erro ao fazer login')
-      setLoading(false)
-    }
-  }
-
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!email) {
-      toast.error('Informe seu email para recuperar a senha')
-      return
-    }
-    setLoading(true)
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback?next=/login`,
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
       })
-      if (error) throw error
-      setResetSent(true)
-      toast.success('Email de recuperação enviado! Verifique sua caixa de entrada.')
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : 'Erro ao enviar email')
-    } finally {
+
+      if (result?.error) {
+        toast.error(result.error)
+        setLoading(false)
+        return
+      }
+
+      toast.success('Login realizado com sucesso!')
+      window.location.href = redirectTo
+    } catch {
+      toast.error('Erro ao fazer login')
       setLoading(false)
     }
-  }
-
-  if (resetSent) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>Email enviado</CardTitle>
-            <CardDescription>
-              Enviamos um link de recuperação de senha para {email}. Verifique sua caixa de
-              entrada e spam.
-            </CardDescription>
-          </CardHeader>
-          <CardFooter>
-            <Button variant="outline" onClick={() => setResetSent(false)}>
-              Voltar ao login
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
-    )
   }
 
   return (
@@ -91,9 +54,9 @@ export function LoginForm() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <img 
-              src="/logo-belgiflow.png" 
-              alt="BelgiFlow Logo" 
+            <img
+              src="/logo-belgiflow.png"
+              alt="BelgiFlow Logo"
               className="h-24 w-auto"
             />
           </div>
@@ -143,16 +106,6 @@ export function LoginForm() {
           <CardFooter className="flex flex-col gap-3">
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Entrando...' : 'Entrar'}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="w-full text-muted-foreground"
-              onClick={handleResetPassword}
-              disabled={loading}
-            >
-              Esqueci minha senha
             </Button>
           </CardFooter>
         </form>

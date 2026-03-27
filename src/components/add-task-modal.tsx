@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import {
   Dialog,
   DialogContent,
@@ -51,18 +50,20 @@ export function AddTaskModal({
     }
     setLoading(true)
     try {
-      const { error } = await createClient()
-        .from('tasks')
-        .insert({
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           lead_id: leadId,
           title: title.trim(),
           description: description.trim() || null,
           due_date: dueDate || null,
           assigned_to: assignedTo && assignedTo !== '__none__' ? assignedTo : null,
           status: 'pending',
-        })
+        }),
+      })
 
-      if (error) throw error
+      if (!res.ok) throw new Error('Erro')
 
       setTitle('')
       setDescription('')
@@ -96,56 +97,30 @@ export function AddTaskModal({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="task-title">Título *</Label>
-            <Input
-              id="task-title"
-              placeholder="Ex: Ligar para o cliente"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              disabled={loading}
-            />
+            <Input id="task-title" placeholder="Ex: Ligar para o cliente" value={title} onChange={(e) => setTitle(e.target.value)} required disabled={loading} />
           </div>
           <div>
             <Label htmlFor="task-desc">Descrição</Label>
-            <textarea
-              id="task-desc"
-              className="w-full min-h-[60px] rounded-md border px-3 py-2 text-sm"
-              placeholder="Detalhes da tarefa..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              disabled={loading}
-            />
+            <textarea id="task-desc" className="w-full min-h-[60px] rounded-md border px-3 py-2 text-sm" placeholder="Detalhes da tarefa..." value={description} onChange={(e) => setDescription(e.target.value)} disabled={loading} />
           </div>
           <div>
             <Label htmlFor="task-due">Data de vencimento</Label>
-            <Input
-              id="task-due"
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              disabled={loading}
-            />
+            <Input id="task-due" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} disabled={loading} />
           </div>
           <div>
             <Label>Atribuir a</Label>
             <Select value={assignedTo} onValueChange={setAssignedTo} disabled={loading}>
-              <SelectTrigger>
-                <SelectValue placeholder="Ninguém" />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Ninguém" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">Ninguém</SelectItem>
                 {members.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.name || m.email}
-                  </SelectItem>
+                  <SelectItem key={m.id} value={m.id}>{m.name || m.email}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleClose}>
-              Cancelar
-            </Button>
+            <Button type="button" variant="outline" onClick={handleClose}>Cancelar</Button>
             <Button type="submit" disabled={loading || !title.trim()}>
               {loading ? 'Adicionando...' : 'Adicionar'}
             </Button>

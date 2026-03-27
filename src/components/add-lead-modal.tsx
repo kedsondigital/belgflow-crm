@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import {
   Dialog,
   DialogContent,
@@ -82,9 +81,10 @@ export function AddLeadModal({
       const parsedValor = valor ? parseFloat(String(valor).replace(/\./g, '').replace(',', '.')) : null
       const valorNum = parsedValor != null && !Number.isNaN(parsedValor) ? parsedValor : null
 
-      const { data: lead, error } = await createClient()
-        .from('leads')
-        .insert({
+      const res = await fetch('/api/leads/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           pipeline_id: pipelineId,
           stage_id: stageId,
           title: title.trim(),
@@ -97,17 +97,15 @@ export function AddLeadModal({
           valor: valorNum ?? null,
           source: 'manual',
           position,
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-
-      await createClient().from('lead_activities').insert({
-        lead_id: lead.id,
-        type: 'created',
-        payload: {},
+        }),
       })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Erro ao criar lead')
+      }
+
+      const { lead } = await res.json()
 
       setTitle('')
       setEmail('')

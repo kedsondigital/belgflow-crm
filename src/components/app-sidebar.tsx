@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { signOut } from 'next-auth/react'
 import {
   LayoutDashboard,
   Users,
@@ -54,9 +55,9 @@ export function AppSidebar({ profile }: AppSidebarProps) {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/pipelines">
-                <img 
-                  src="/lg-belgiflow.png" 
-                  alt="BelgiFlow" 
+                <img
+                  src="/lg-belgiflow.png"
+                  alt="BelgiFlow"
                   className="h-8 w-auto"
                 />
               </Link>
@@ -112,11 +113,9 @@ export function AppSidebar({ profile }: AppSidebarProps) {
                 Configurações
               </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <a href="/auth/logout">
-                <LogOut className="mr-2 size-4" />
-                Sair
-              </a>
+            <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/login' })}>
+              <LogOut className="mr-2 size-4" />
+              Sair
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

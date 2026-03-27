@@ -13,7 +13,6 @@ import {
   useSensors,
 } from '@dnd-kit/core'
 import { Plus } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import { KanbanColumn } from '@/components/kanban-column'
 import { LeadCardPreview } from '@/components/lead-card-preview'
 import { LeadDrawer } from '@/components/lead-drawer'
@@ -62,7 +61,6 @@ export function KanbanBoard({
   const [selectedLead, setSelectedLead] = useState<string | null>(null)
   const [activeLead, setActiveLead] = useState<(Lead & { lead_tags?: { tag: string }[]; profiles?: { name: string; email: string } | null }) | null>(null)
   const [addStageOpen, setAddStageOpen] = useState(false)
-  const supabase = createClient()
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -78,20 +76,25 @@ export function KanbanBoard({
     newStageId: string,
     newPosition: number
   ) => {
-    const { error } = await supabase
-      .from('leads')
-      .update({ stage_id: newStageId, position: newPosition })
-      .eq('id', leadId)
+    const res = await fetch(`/api/leads/${leadId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stageId: newStageId, position: newPosition }),
+    })
 
-    if (error) {
+    if (!res.ok) {
       toast.error('Erro ao mover lead')
       return false
     }
 
-    await supabase.from('lead_activities').insert({
-      lead_id: leadId,
-      type: 'stage_change',
-      payload: { new_stage_id: newStageId },
+    await fetch('/api/lead-activities', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lead_id: leadId,
+        type: 'stage_change',
+        payload: { new_stage_id: newStageId },
+      }),
     })
 
     return true
@@ -206,8 +209,8 @@ export function KanbanBoard({
   }
 
   const handleLeadDeleted = async (leadId: string) => {
-    const { error } = await supabase.from('leads').delete().eq('id', leadId)
-    if (error) {
+    const res = await fetch(`/api/leads/${leadId}`, { method: 'DELETE' })
+    if (!res.ok) {
       toast.error('Erro ao excluir lead')
       return
     }
@@ -223,13 +226,14 @@ export function KanbanBoard({
   }
 
   const handleEditStage = async (stageId: string, newName: string) => {
-    const { error } = await supabase
-      .from('stages')
-      .update({ name: newName })
-      .eq('id', stageId)
-    if (error) {
+    const res = await fetch(`/api/stages/${stageId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName }),
+    })
+    if (!res.ok) {
       toast.error('Erro ao renomear estágio')
-      throw error
+      throw new Error('Failed')
     }
     setStages((prev) =>
       prev.map((s) => (s.id === stageId ? { ...s, name: newName } : s))
@@ -248,8 +252,8 @@ export function KanbanBoard({
       toast.error('O pipeline precisa ter pelo menos um estágio')
       return
     }
-    const { error } = await supabase.from('stages').delete().eq('id', stageId)
-    if (error) {
+    const res = await fetch(`/api/stages/${stageId}`, { method: 'DELETE' })
+    if (!res.ok) {
       toast.error('Erro ao excluir estágio')
       return
     }
@@ -259,19 +263,20 @@ export function KanbanBoard({
 
   const handleAddStage = async (name: string) => {
     const maxPos = Math.max(...stages.map((s) => s.position), -1)
-    const { data: newStage, error } = await supabase
-      .from('stages')
-      .insert({
+    const res = await fetch('/api/stages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         pipeline_id: pipelineId,
         name,
         position: maxPos + 1,
-      })
-      .select()
-      .single()
-    if (error) {
+      }),
+    })
+    if (!res.ok) {
       toast.error('Erro ao adicionar estágio')
-      throw error
+      throw new Error('Failed')
     }
+    const newStage = await res.json()
     setStages((prev) => [...prev, { ...newStage, leads: [] }])
     toast.success('Estágio adicionado')
   }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 
 const IngestLeadSchema = z.object({
@@ -14,7 +14,7 @@ const IngestLeadSchema = z.object({
   notes: z.string().optional(),
   nacionalidade: z.string().optional(),
   resumo: z.string().optional(),
-  valor: z.number().optional().or(z.string().transform((v) => v ? parseFloat(v) : undefined)),
+  valor: z.union([z.string(), z.number().transform(String)]).optional(),
   tags: z.array(z.string()).optional().default([]),
   linkedin: z.string().optional(),
   facebook: z.string().optional(),
@@ -57,30 +57,23 @@ export async function POST(request: NextRequest) {
   }
 
   const data = parseResult.data
-  const supabase = createAdminClient()
 
-  const { data: pipeline, error: pipelineError } = await supabase
-    .from('pipelines')
-    .select('id')
-    .eq('id', data.pipeline_id)
-    .eq('is_archived', false)
-    .single()
+  const pipeline = await prisma.pipeline.findFirst({
+    where: { id: data.pipeline_id, isArchived: false },
+  })
 
-  if (pipelineError || !pipeline) {
+  if (!pipeline) {
     return NextResponse.json(
       { error: 'Not Found', message: 'Pipeline not found or archived' },
       { status: 404 }
     )
   }
 
-  const { data: stages } = await supabase
-    .from('stages')
-    .select('id')
-    .eq('pipeline_id', data.pipeline_id)
-    .order('position', { ascending: true })
-    .limit(1)
+  const entradaStage = await prisma.stage.findFirst({
+    where: { pipelineId: data.pipeline_id },
+    orderBy: { position: 'asc' },
+  })
 
-  const entradaStage = stages?.[0]
   if (!entradaStage) {
     return NextResponse.json(
       { error: 'Bad Request', message: 'Pipeline has no stages' },
@@ -90,14 +83,9 @@ export async function POST(request: NextRequest) {
 
   const dedupeField = process.env.N8N_DEDUPE_FIELD || 'email'
   if (dedupeField === 'email' && data.email) {
-    const { data: existing } = await supabase
-      .from('leads')
-      .select('id')
-      .eq('pipeline_id', data.pipeline_id)
-      .eq('email', data.email)
-      .limit(1)
-      .single()
-
+    const existing = await prisma.lead.findFirst({
+      where: { pipelineId: data.pipeline_id, email: data.email },
+    })
     if (existing) {
       return NextResponse.json(
         { error: 'Conflict', message: 'Lead with this email already exists in pipeline' },
@@ -105,14 +93,9 @@ export async function POST(request: NextRequest) {
       )
     }
   } else if (dedupeField === 'phone' && data.phone) {
-    const { data: existing } = await supabase
-      .from('leads')
-      .select('id')
-      .eq('pipeline_id', data.pipeline_id)
-      .eq('phone', data.phone)
-      .limit(1)
-      .single()
-
+    const existing = await prisma.lead.findFirst({
+      where: { pipelineId: data.pipeline_id, phone: data.phone },
+    })
     if (existing) {
       return NextResponse.json(
         { error: 'Conflict', message: 'Lead with this phone already exists in pipeline' },
@@ -120,14 +103,9 @@ export async function POST(request: NextRequest) {
       )
     }
   } else if (dedupeField === 'website' && data.website) {
-    const { data: existing } = await supabase
-      .from('leads')
-      .select('id')
-      .eq('pipeline_id', data.pipeline_id)
-      .eq('website', data.website)
-      .limit(1)
-      .single()
-
+    const existing = await prisma.lead.findFirst({
+      where: { pipelineId: data.pipeline_id, website: data.website },
+    })
     if (existing) {
       return NextResponse.json(
         { error: 'Conflict', message: 'Lead with this website already exists in pipeline' },
@@ -136,59 +114,59 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const { data: lead, error: leadError } = await supabase
-    .from('leads')
-    .insert({
-      pipeline_id: data.pipeline_id,
-      stage_id: entradaStage.id,
-      title: data.title,
-      email: data.email || null,
-      phone: data.phone || null,
-      phone_country_code: data.phone ? (data.phone_country_code || '32') : null,
-      whatsapp: data.whatsapp || null,
-      website: data.website || null,
-      source: data.source,
-      notes: data.notes || null,
-      nacionalidade: data.nacionalidade || null,
-      resumo: data.resumo || null,
-      valor: data.valor || null,
-      linkedin: data.linkedin || null,
-      facebook: data.facebook || null,
-      instagram: data.instagram || null,
-      nome_dono: data.nome_dono || null,
-      email_dono: data.email_dono || null,
-      position: 0,
+  try {
+    const lead = await prisma.lead.create({
+      data: {
+        pipelineId: data.pipeline_id,
+        stageId: entradaStage.id,
+        title: data.title,
+        email: data.email || null,
+        phone: data.phone || null,
+        phoneCountryCode: data.phone ? (data.phone_country_code || '32') : null,
+        whatsapp: data.whatsapp || null,
+        website: data.website || null,
+        source: data.source,
+        notes: data.notes || null,
+        nacionalidade: data.nacionalidade || null,
+        resumo: data.resumo || null,
+        valor: data.valor ? String(data.valor) : null,
+        linkedin: data.linkedin || null,
+        facebook: data.facebook || null,
+        instagram: data.instagram || null,
+        nomeDono: data.nome_dono || null,
+        emailDono: data.email_dono || null,
+        position: 0,
+      },
     })
-    .select()
-    .single()
 
-  if (leadError) {
-    console.error('Ingest lead error:', leadError)
+    if (data.tags && data.tags.length > 0) {
+      await prisma.leadTag.createMany({
+        data: data.tags.map((tag) => ({ leadId: lead.id, tag })),
+      })
+    }
+
+    await prisma.leadActivity.create({
+      data: {
+        leadId: lead.id,
+        type: 'created',
+        payload: { source: data.source },
+      },
+    })
+
+    return NextResponse.json({
+      success: true,
+      lead: {
+        id: lead.id,
+        title: lead.title,
+        pipeline_id: lead.pipelineId,
+        stage_id: lead.stageId,
+      },
+    })
+  } catch (err) {
+    console.error('Ingest lead error:', err)
     return NextResponse.json(
       { error: 'Internal Error', message: 'Failed to create lead' },
       { status: 500 }
     )
   }
-
-  if (data.tags && data.tags.length > 0) {
-    await supabase.from('lead_tags').insert(
-      data.tags.map((tag) => ({ lead_id: lead.id, tag }))
-    )
-  }
-
-  await supabase.from('lead_activities').insert({
-    lead_id: lead.id,
-    type: 'created',
-    payload: { source: data.source },
-  })
-
-  return NextResponse.json({
-    success: true,
-    lead: {
-      id: lead.id,
-      title: lead.title,
-      pipeline_id: lead.pipeline_id,
-      stage_id: lead.stage_id,
-    },
-  })
 }

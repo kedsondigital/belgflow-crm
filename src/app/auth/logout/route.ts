@@ -1,11 +1,9 @@
-import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
-  const supabase = await createClient()
-  await supabase.auth.signOut()
-  const url = new URL('/login', process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000')
-  return NextResponse.redirect(url)
+// Logout is now handled by NextAuth's signOut - redirect to API
+export async function GET(request: Request) {
+  const { origin } = new URL(request.url)
+  return NextResponse.redirect(`${origin}/api/auth/signout`)
 }

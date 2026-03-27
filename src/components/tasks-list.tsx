@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
-import { createClient } from '@/lib/supabase/client'
 import { Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getErrorMessage } from '@/lib/utils'
@@ -29,7 +28,6 @@ interface TasksListProps {
 
 export function TasksList({ tasks: initialTasks, members = [] }: TasksListProps) {
   const router = useRouter()
-  const supabase = createClient()
   const [tasks, setTasks] = useState(initialTasks)
   useEffect(() => {
     setTasks(initialTasks)
@@ -45,21 +43,19 @@ export function TasksList({ tasks: initialTasks, members = [] }: TasksListProps)
   } | null>(null)
 
   const handleToggleStatus = async (taskId: string, currentStatus: string) => {
-    const newStatus =
-      currentStatus === 'completed' ? 'pending' : 'completed'
-    const { error } = await supabase
-      .from('tasks')
-      .update({ status: newStatus })
-      .eq('id', taskId)
+    const newStatus = currentStatus === 'completed' ? 'pending' : 'completed'
+    const res = await fetch(`/api/tasks/${taskId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus }),
+    })
 
-    if (error) {
+    if (!res.ok) {
       toast.error('Erro ao atualizar tarefa')
     } else {
       toast.success('Tarefa atualizada')
       setTasks((prev) =>
-        prev.map((t) =>
-          t.id === taskId ? { ...t, status: newStatus } : t
-        )
+        prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t))
       )
     }
   }
@@ -92,17 +88,11 @@ export function TasksList({ tasks: initialTasks, members = [] }: TasksListProps)
                 onCheckedChange={() => handleToggleStatus(task.id, task.status)}
               />
               <div className="flex-1 min-w-0">
-                <p
-                  className={`font-medium ${
-                    task.status === 'completed' ? 'line-through text-muted-foreground' : ''
-                  }`}
-                >
+                <p className={`font-medium ${task.status === 'completed' ? 'line-through text-muted-foreground' : ''}`}>
                   {task.title}
                 </p>
                 {task.description && (
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    {task.description}
-                  </p>
+                  <p className="text-sm text-muted-foreground mt-0.5">{task.description}</p>
                 )}
                 <div className="flex items-center gap-2 mt-2">
                   <Badge variant={statusColors[task.status] as 'secondary' | 'default' | 'outline' | 'destructive'}>
@@ -111,9 +101,7 @@ export function TasksList({ tasks: initialTasks, members = [] }: TasksListProps)
                   {(() => {
                     const l = Array.isArray(task.leads) ? task.leads[0] : task.leads
                     return l?.title ? (
-                      <span className="text-xs text-muted-foreground">
-                        Lead: {l.title}
-                      </span>
+                      <span className="text-xs text-muted-foreground">Lead: {l.title}</span>
                     ) : null
                   })()}
                   {task.due_date && (
@@ -148,8 +136,8 @@ export function TasksList({ tasks: initialTasks, members = [] }: TasksListProps)
                   className="size-8 text-destructive hover:text-destructive"
                   onClick={async () => {
                     if (!confirm('Excluir esta tarefa?')) return
-                    const { error } = await supabase.from('tasks').delete().eq('id', task.id)
-                    if (error) toast.error(getErrorMessage(error, 'Erro ao excluir'))
+                    const res = await fetch(`/api/tasks/${task.id}`, { method: 'DELETE' })
+                    if (!res.ok) toast.error(getErrorMessage(null, 'Erro ao excluir'))
                     else {
                       setTasks((prev) => prev.filter((t) => t.id !== task.id))
                       toast.success('Tarefa excluída')
@@ -167,9 +155,7 @@ export function TasksList({ tasks: initialTasks, members = [] }: TasksListProps)
         open={editTaskOpen}
         onOpenChange={setEditTaskOpen}
         task={editingTask}
-        onTaskUpdated={() => {
-          router.refresh()
-        }}
+        onTaskUpdated={() => router.refresh()}
         members={members}
       />
     </div>

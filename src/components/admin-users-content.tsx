@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import {
   Table,
   TableBody,
@@ -53,9 +52,7 @@ export function AdminUsersContent({
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [addUserOpen, setAddUserOpen] = useState(false)
-  const [userPipelineAccess, setUserPipelineAccess] = useState<
-    Record<string, string[]>
-  >({})
+  const [userPipelineAccess, setUserPipelineAccess] = useState<Record<string, string[]>>({})
   const [loading, setLoading] = useState(false)
 
   const getUserPipelines = (userId: string): string[] =>
@@ -63,9 +60,7 @@ export function AdminUsersContent({
 
   const handleOpenEdit = (userId: string) => {
     setEditingUser(userId)
-    setUserPipelineAccess({
-      [userId]: getUserPipelines(userId),
-    })
+    setUserPipelineAccess({ [userId]: getUserPipelines(userId) })
   }
 
   const handleTogglePipeline = (userId: string, pipelineId: string) => {
@@ -74,9 +69,7 @@ export function AdminUsersContent({
       const has = current.includes(pipelineId)
       return {
         ...prev,
-        [userId]: has
-          ? current.filter((p) => p !== pipelineId)
-          : [...current, pipelineId],
+        [userId]: has ? current.filter((p) => p !== pipelineId) : [...current, pipelineId],
       }
     })
   }
@@ -84,24 +77,19 @@ export function AdminUsersContent({
   const handleSaveAccess = async () => {
     if (!editingUser) return
     setLoading(true)
-    const supabase = createClient()
     const targetPipelines = userPipelineAccess[editingUser] || []
 
     try {
-      await supabase
-        .from('pipeline_members')
-        .delete()
-        .eq('user_id', editingUser)
-
-      if (targetPipelines.length > 0) {
-        await supabase.from('pipeline_members').insert(
-          targetPipelines.map((pipeline_id) => ({
-            pipeline_id,
-            user_id: editingUser,
-            role_in_pipeline: 'member',
-          }))
-        )
-      }
+      const res = await fetch('/api/pipeline-members', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: editingUser,
+          pipeline_ids: targetPipelines,
+          role_in_pipeline: 'member',
+        }),
+      })
+      if (!res.ok) throw new Error()
 
       toast.success('Acesso atualizado')
       setEditingUser(null)
@@ -114,40 +102,39 @@ export function AdminUsersContent({
   }
 
   const handleToggleAdmin = async (userId: string, isAdmin: boolean) => {
-    const supabase = createClient()
-    
     if (!isAdmin) {
-      // Está tornando admin: adiciona acesso a todos os pipelines
-      // Remove membros existentes para evitar duplicatas
-      await supabase
-        .from('pipeline_members')
-        .delete()
-        .eq('user_id', userId)
-
-      // Adiciona como admin em todos os pipelines
-      if (pipelines.length > 0) {
-        await supabase.from('pipeline_members').insert(
-          pipelines.map((pipeline) => ({
-            pipeline_id: pipeline.id,
-            user_id: userId,
-            role_in_pipeline: 'admin',
-          }))
-        )
-      }
+      // Making admin: add to all pipelines
+      await fetch('/api/pipeline-members', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userId,
+          pipeline_ids: pipelines.map((p) => p.id),
+          role_in_pipeline: 'admin',
+        }),
+      })
     } else {
-      // Está removendo admin: remove acesso a todos os pipelines
-      await supabase
-        .from('pipeline_members')
-        .delete()
-        .eq('user_id', userId)
+      // Removing admin: remove from all pipelines
+      await fetch('/api/pipeline-members', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userId,
+          pipeline_ids: [],
+        }),
+      })
     }
 
-    const { error } = await supabase
-      .from('profiles')
-      .update({ role_global: isAdmin ? 'MEMBER' : 'ADMIN' })
-      .eq('id', userId)
+    const res = await fetch('/api/profiles', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: userId,
+        role_global: isAdmin ? 'MEMBER' : 'ADMIN',
+      }),
+    })
 
-    if (error) {
+    if (!res.ok) {
       toast.error('Erro ao alterar permissão')
     } else {
       toast.success(isAdmin ? 'Permissão de Admin removida e acessos aos pipelines revogados' : 'Usuário agora é Admin com acesso completo a todos os pipelines')
@@ -156,13 +143,13 @@ export function AdminUsersContent({
   }
 
   const handleToggleActive = async (userId: string, isActive: boolean) => {
-    const supabase = createClient()
-    const { error } = await supabase
-      .from('profiles')
-      .update({ is_active: !isActive })
-      .eq('id', userId)
+    const res = await fetch('/api/profiles', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: userId, is_active: !isActive }),
+    })
 
-    if (error) {
+    if (!res.ok) {
       toast.error('Erro ao alterar status')
     } else {
       toast.success('Status atualizado')
@@ -281,9 +268,7 @@ export function AdminUsersContent({
                 <TableCell>{u.name || '-'}</TableCell>
                 <TableCell>{u.email}</TableCell>
                 <TableCell>
-                  <Badge
-                    variant={u.role_global === 'ADMIN' ? 'default' : 'secondary'}
-                  >
+                  <Badge variant={u.role_global === 'ADMIN' ? 'default' : 'secondary'}>
                     {u.role_global}
                   </Badge>
                 </TableCell>
@@ -292,41 +277,23 @@ export function AdminUsersContent({
                     {u.is_active ? 'Ativo' : 'Inativo'}
                   </Badge>
                 </TableCell>
-                <TableCell>
-                  {getUserPipelines(u.id).length} pipeline(s)
-                </TableCell>
+                <TableCell>{getUserPipelines(u.id).length} pipeline(s)</TableCell>
                 <TableCell>
                   <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleOpenEdit(u.id)}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => handleOpenEdit(u.id)}>
                       Acesso
                     </Button>
                     {u.role_global !== 'ADMIN' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleToggleAdmin(u.id, false)}
-                      >
+                      <Button variant="outline" size="sm" onClick={() => handleToggleAdmin(u.id, false)}>
                         Tornar Admin
                       </Button>
                     )}
                     {u.role_global === 'ADMIN' && users.filter((x) => x.role_global === 'ADMIN').length > 1 && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleToggleAdmin(u.id, true)}
-                      >
+                      <Button variant="outline" size="sm" onClick={() => handleToggleAdmin(u.id, true)}>
                         Remover Admin
                       </Button>
                     )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleToggleActive(u.id, u.is_active)}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => handleToggleActive(u.id, u.is_active)}>
                       {u.is_active ? 'Desativar' : 'Ativar'}
                     </Button>
                     <Button
@@ -358,38 +325,25 @@ export function AdminUsersContent({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Acesso a Pipelines</DialogTitle>
-            <DialogDescription>
-              Selecione os pipelines que este usuário pode acessar
-            </DialogDescription>
+            <DialogDescription>Selecione os pipelines que este usuário pode acessar</DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-4">
             {pipelines.map((p) => (
-              <div
-                key={p.id}
-                className="flex items-center gap-2"
-              >
+              <div key={p.id} className="flex items-center gap-2">
                 <Checkbox
                   id={`pipeline-${p.id}`}
                   checked={
-                    (userPipelineAccess[editingUser!] || getUserPipelines(editingUser!)).includes(
-                      p.id
-                    )
+                    (userPipelineAccess[editingUser!] || getUserPipelines(editingUser!)).includes(p.id)
                   }
-                  onCheckedChange={() =>
-                    editingUser && handleTogglePipeline(editingUser, p.id)
-                  }
+                  onCheckedChange={() => editingUser && handleTogglePipeline(editingUser, p.id)}
                 />
                 <Label htmlFor={`pipeline-${p.id}`}>{p.name}</Label>
               </div>
             ))}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingUser(null)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSaveAccess} disabled={loading}>
-              Salvar
-            </Button>
+            <Button variant="outline" onClick={() => setEditingUser(null)}>Cancelar</Button>
+            <Button onClick={handleSaveAccess} disabled={loading}>Salvar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -405,9 +359,7 @@ export function AdminUsersContent({
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeletingUser(null)} disabled={loading}>
-              Cancelar
-            </Button>
+            <Button variant="outline" onClick={() => setDeletingUser(null)} disabled={loading}>Cancelar</Button>
             <Button variant="destructive" onClick={handleDeleteUser} disabled={loading}>
               {loading ? 'Removendo...' : 'Remover'}
             </Button>
@@ -420,8 +372,7 @@ export function AdminUsersContent({
           <DialogHeader>
             <DialogTitle>Definir Senha</DialogTitle>
             <DialogDescription>
-              Defina uma nova senha para{' '}
-              <strong>{passwordUser?.name || passwordUser?.email}</strong>
+              Defina uma nova senha para <strong>{passwordUser?.name || passwordUser?.email}</strong>
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -449,13 +400,8 @@ export function AdminUsersContent({
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={handleClosePasswordModal} disabled={loading}>
-              Cancelar
-            </Button>
-            <Button 
-              onClick={handleResetPassword} 
-              disabled={loading || !newPassword || !confirmPassword}
-            >
+            <Button variant="outline" onClick={handleClosePasswordModal} disabled={loading}>Cancelar</Button>
+            <Button onClick={handleResetPassword} disabled={loading || !newPassword || !confirmPassword}>
               {loading ? 'Salvando...' : 'Salvar Senha'}
             </Button>
           </DialogFooter>

@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import {
   Dialog,
   DialogContent,
@@ -40,67 +39,21 @@ export function NewPipelineModal({
     }
     setLoading(true)
     try {
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) throw new Error('Não autenticado')
-
-      const { data: pipeline, error: pipelineError } = await supabase
-        .from('pipelines')
-        .insert({
+      const res = await fetch('/api/pipelines', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           name: name.trim(),
           description: description.trim() || null,
-          created_by: user.id,
-        })
-        .select('id')
-        .single()
+        }),
+      })
 
-      if (pipelineError) throw pipelineError
-
-      // Busca todos os admins do sistema para adicionar ao pipeline
-      const { data: admins } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('role_global', 'ADMIN')
-
-      // Adiciona o criador e todos os admins como membros do pipeline
-      const membersToAdd = new Set<string>()
-      membersToAdd.add(user.id) // Criador sempre é adicionado
-      
-      if (admins) {
-        admins.forEach((admin) => membersToAdd.add(admin.id))
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Erro ao criar pipeline')
       }
 
-      const { error: membersError } = await supabase
-        .from('pipeline_members')
-        .insert(
-          Array.from(membersToAdd).map((userId) => ({
-            pipeline_id: pipeline.id,
-            user_id: userId,
-            role_in_pipeline: 'admin',
-          }))
-        )
-
-      if (membersError) throw membersError
-
-      const defaultStages = [
-        { name: 'Entrada', position: 0 },
-        { name: 'Qualificação', position: 1 },
-        { name: 'Proposta', position: 2 },
-        { name: 'Negociação', position: 3 },
-        { name: 'Fechado', position: 4 },
-      ]
-
-      const { error: stagesError } = await supabase.from('stages').insert(
-        defaultStages.map((s) => ({
-          pipeline_id: pipeline.id,
-          name: s.name,
-          position: s.position,
-        }))
-      )
-
-      if (stagesError) throw stagesError
+      const { id } = await res.json()
 
       setName('')
       setDescription('')
@@ -108,9 +61,9 @@ export function NewPipelineModal({
       toast.success('Pipeline criado com sucesso!')
 
       if (onCreated) {
-        onCreated(pipeline.id)
+        onCreated(id)
       } else {
-        router.push(`/pipelines/${pipeline.id}`)
+        router.push(`/pipelines/${id}`)
         router.refresh()
       }
     } catch (error: unknown) {

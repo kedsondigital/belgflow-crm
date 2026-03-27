@@ -1,17 +1,44 @@
-import { type NextRequest } from 'next/server'
-import { updateSession } from '@/lib/supabase/middleware'
+import { withAuth } from 'next-auth/middleware'
+import { NextResponse } from 'next/server'
 
-export async function middleware(request: NextRequest) {
-  return await updateSession(request)
-}
+export default withAuth(
+  function middleware(request) {
+    const path = request.nextUrl.pathname
+    const token = request.nextauth.token
+
+    // Redirect logged-in users away from login page
+    if (token && path === '/login') {
+      return NextResponse.redirect(new URL('/pipelines', request.url))
+    }
+
+    return NextResponse.next()
+  },
+  {
+    callbacks: {
+      authorized: ({ token, req }) => {
+        const path = req.nextUrl.pathname
+
+        // Allow public paths
+        if (
+          path === '/login' ||
+          path.startsWith('/api/auth') ||
+          path.startsWith('/api/n8n')
+        ) {
+          return true
+        }
+
+        // All other paths require authentication
+        return !!token
+      },
+    },
+    pages: {
+      signIn: '/login',
+    },
+  }
+)
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next (static files, HMR, etc)
-     * - static files (images, favicon, etc)
-     */
     '/((?!_next|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 }

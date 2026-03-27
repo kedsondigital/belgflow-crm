@@ -1,5 +1,6 @@
 import dynamic from 'next/dynamic'
-import { createClient } from '@/lib/supabase/server'
+import { getSession } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -12,23 +13,38 @@ const LeadsTable = dynamic(
 )
 
 export default async function LeadsPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const session = await getSession()
+  if (!session?.user) redirect('/login')
 
-  if (!user) redirect('/login')
-
-  const [leadsRes, pipelinesRes] = await Promise.all([
-    supabase
-      .from('leads')
-      .select(`id, title, email, phone, source, outcome, created_at, stage_id, assignee_user_id, lead_tags(tag), stages(name, pipeline_id), profiles:assignee_user_id(name, email)`)
-      .order('created_at', { ascending: false }),
-    supabase.from('pipelines').select('id, name').eq('is_archived', false),
+  const [leads, pipelines] = await Promise.all([
+    prisma.lead.findMany({
+      include: {
+        tags: { select: { tag: true } },
+        stage: { select: { name: true, pipelineId: true } },
+        assignee: { select: { name: true, email: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.pipeline.findMany({
+      where: { isArchived: false },
+      select: { id: true, name: true },
+    }),
   ])
 
-  const leads = leadsRes.data || []
-  const pipelines = pipelinesRes.data || []
+  const leadsData = leads.map((l) => ({
+    id: l.id,
+    title: l.title,
+    email: l.email,
+    phone: l.phone,
+    source: l.source,
+    outcome: l.outcome,
+    created_at: l.createdAt.toISOString(),
+    stage_id: l.stageId,
+    assignee_user_id: l.assigneeUserId,
+    lead_tags: l.tags.map((t) => ({ tag: t.tag })),
+    stages: { name: l.stage.name, pipeline_id: l.stage.pipelineId },
+    profiles: l.assignee ? { name: l.assignee.name || '', email: l.assignee.email } : null,
+  }))
 
   return (
     <div className="space-y-6">
@@ -38,10 +54,7 @@ export default async function LeadsPage() {
           Visualize e gerencie todos os leads
         </p>
       </div>
-      <LeadsTable
-        leads={leads}
-        pipelines={pipelines}
-      />
+      <LeadsTable leads={leadsData} pipelines={pipelines} />
     </div>
   )
 }

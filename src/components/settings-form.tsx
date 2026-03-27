@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -20,7 +19,7 @@ interface SettingsFormProps {
 export function SettingsForm({ profile }: SettingsFormProps) {
   const [name, setName] = useState(profile?.name || '')
   const [loading, setLoading] = useState(false)
-  
+
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -32,13 +31,14 @@ export function SettingsForm({ profile }: SettingsFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    const supabase = createClient()
-    const { error } = await supabase
-      .from('profiles')
-      .update({ name: name.trim() || null })
-      .eq('id', profile!.id)
 
-    if (error) {
+    const res = await fetch('/api/profiles', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name.trim() || null }),
+    })
+
+    if (!res.ok) {
       toast.error('Erro ao atualizar')
     } else {
       toast.success('Perfil atualizado')
@@ -48,7 +48,7 @@ export function SettingsForm({ profile }: SettingsFormProps) {
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (newPassword.length < 6) {
       toast.error('A nova senha deve ter pelo menos 6 caracteres')
       return
@@ -60,34 +60,29 @@ export function SettingsForm({ profile }: SettingsFormProps) {
     }
 
     setPasswordLoading(true)
-    const supabase = createClient()
 
-    // Primeiro verifica a senha atual fazendo login
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: profile?.email || '',
-      password: currentPassword,
-    })
+    try {
+      const res = await fetch('/api/settings/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      })
 
-    if (signInError) {
-      toast.error('Senha atual incorreta')
-      setPasswordLoading(false)
-      return
-    }
+      const data = await res.json()
 
-    // Atualiza a senha
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword,
-    })
-
-    if (error) {
+      if (!res.ok) {
+        toast.error(data.error || 'Erro ao alterar senha')
+      } else {
+        toast.success('Senha alterada com sucesso')
+        setCurrentPassword('')
+        setNewPassword('')
+        setConfirmPassword('')
+      }
+    } catch {
       toast.error('Erro ao alterar senha')
-    } else {
-      toast.success('Senha alterada com sucesso')
-      setCurrentPassword('')
-      setNewPassword('')
-      setConfirmPassword('')
+    } finally {
+      setPasswordLoading(false)
     }
-    setPasswordLoading(false)
   }
 
   return (
@@ -169,9 +164,7 @@ export function SettingsForm({ profile }: SettingsFormProps) {
                   {showNewPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Mínimo de 6 caracteres
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">Mínimo de 6 caracteres</p>
             </div>
             <div>
               <Label htmlFor="confirmPassword">Confirmar Nova Senha</Label>

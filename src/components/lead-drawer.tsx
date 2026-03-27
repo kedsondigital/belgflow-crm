@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import {
   Sheet,
   SheetContent,
@@ -87,23 +86,21 @@ export function LeadDrawer({
   } | null>(null)
   const [newNote, setNewNote] = useState('')
   const [newTag, setNewTag] = useState('')
-  const supabase = createClient()
 
   useEffect(() => {
     if (!open || !leadId) return
 
     const fetchData = async () => {
       setLoading(true)
-      const { data: leadData } = await supabase
-        .from('leads')
-        .select(`
-          *,
-          lead_tags(tag)
-        `)
-        .eq('id', leadId)
-        .single()
 
-      if (leadData) {
+      const [leadRes, activitiesRes, tasksRes] = await Promise.all([
+        fetch(`/api/leads/${leadId}`),
+        fetch(`/api/lead-activities?lead_id=${leadId}`),
+        fetch(`/api/tasks?lead_id=${leadId}`),
+      ])
+
+      if (leadRes.ok) {
+        const leadData = await leadRes.json()
         setLead(leadData)
         const pcCode = (leadData.phone_country_code as string) || '32'
         const wapp = String(leadData.whatsapp || '').replace(/\D/g, '')
@@ -136,33 +133,25 @@ export function LeadDrawer({
         })
       }
 
-      const { data: activitiesData } = await supabase
-        .from('lead_activities')
-        .select('*')
-        .eq('lead_id', leadId)
-        .order('created_at', { ascending: false })
+      if (activitiesRes.ok) {
+        setActivities(await activitiesRes.json())
+      }
 
-      setActivities(activitiesData || [])
+      if (tasksRes.ok) {
+        setTasks(await tasksRes.json())
+      }
 
-      const { data: tasksData } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('lead_id', leadId)
-        .order('due_date', { ascending: true })
-
-      setTasks(tasksData || [])
       setLoading(false)
     }
 
     fetchData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, leadId])
 
   const handleDeleteLead = async () => {
     if (!confirm('Excluir este lead? Esta ação não pode ser desfeita.')) return
     try {
-      const { error } = await supabase.from('leads').delete().eq('id', leadId)
-      if (error) throw error
+      const res = await fetch(`/api/leads/${leadId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Erro ao excluir')
       toast.success('Lead excluído')
       onClose()
       onDelete?.(leadId)
@@ -180,20 +169,21 @@ export function LeadDrawer({
 
     setFormData((p) => ({ ...p, assignee_user_id: newAssigneeId }))
     try {
-      const { error } = await supabase
-        .from('leads')
-        .update({ assignee_user_id: effectiveNew })
-        .eq('id', leadId)
+      const res = await fetch(`/api/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assigneeUserId: effectiveNew }),
+      })
+      if (!res.ok) throw new Error('Erro')
 
-      if (error) throw error
-
-      await supabase.from('lead_activities').insert({
-        lead_id: leadId,
-        type: 'assignee_change',
-        payload: {
-          old_assignee_id: prevEffective,
-          new_assignee_id: effectiveNew,
-        },
+      await fetch('/api/lead-activities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lead_id: leadId,
+          type: 'assignee_change',
+          payload: { old_assignee_id: prevEffective, new_assignee_id: effectiveNew },
+        }),
       })
 
       setActivities((prev) => [
@@ -228,47 +218,56 @@ export function LeadDrawer({
 
       const newAssigneeId = formData.assignee_user_id && formData.assignee_user_id !== '__none__' ? formData.assignee_user_id : null
 
-      const { error: updateError } = await supabase
-        .from('leads')
-        .update({
+      const res = await fetch(`/api/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           title: formData.title,
           email: formData.email || null,
           phone: formData.phone || null,
-          phone_country_code: formData.phone ? formData.phone_country_code : null,
+          phoneCountryCode: formData.phone ? formData.phone_country_code : null,
           whatsapp: fullPhone,
           website: formData.website || null,
           source: formData.source,
           notes: formData.notes || null,
-          assignee_user_id: newAssigneeId,
+          assigneeUserId: newAssigneeId,
           resumo: formData.resumo || null,
           nacionalidade: formData.nacionalidade?.trim() || null,
           valor: valorNum,
           linkedin: formData.linkedin || null,
           facebook: formData.facebook || null,
           instagram: formData.instagram || null,
-          nome_dono: formData.nome_dono || null,
-          email_dono: formData.email_dono || null,
-        })
-        .eq('id', leadId)
+          nomeDono: formData.nome_dono || null,
+          emailDono: formData.email_dono || null,
+        }),
+      })
 
-      if (updateError) throw updateError
+      if (!res.ok) throw new Error('Erro ao salvar')
 
       const assigneeChanged = (prevAssigneeId || '__none__') !== (newAssigneeId || '__none__')
       if (assigneeChanged) {
-        await supabase.from('lead_activities').insert({
-          lead_id: leadId,
-          type: 'assignee_change',
-          payload: {
-            old_assignee_id: prevAssigneeId && prevAssigneeId !== '__none__' ? prevAssigneeId : null,
-            new_assignee_id: newAssigneeId,
-          },
+        await fetch('/api/lead-activities', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            lead_id: leadId,
+            type: 'assignee_change',
+            payload: {
+              old_assignee_id: prevAssigneeId && prevAssigneeId !== '__none__' ? prevAssigneeId : null,
+              new_assignee_id: newAssigneeId,
+            },
+          }),
         })
       }
 
-      await supabase.from('lead_activities').insert({
-        lead_id: leadId,
-        type: 'field_edit',
-        payload: { fields: Object.keys(formData) },
+      await fetch('/api/lead-activities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lead_id: leadId,
+          type: 'field_edit',
+          payload: { fields: Object.keys(formData) },
+        }),
       })
 
       toast.success('Lead atualizado')
@@ -285,19 +284,24 @@ export function LeadDrawer({
     if (!newNote.trim()) return
     const noteText = newNote.trim()
     try {
-      await supabase.from('lead_activities').insert({
-        lead_id: leadId,
-        type: 'note_added',
-        payload: { note: noteText },
+      await fetch('/api/lead-activities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lead_id: leadId,
+          type: 'note_added',
+          payload: { note: noteText },
+        }),
       })
 
       const updatedNotes = [formData.notes, noteText].filter(Boolean).join('\n\n')
-      const { error } = await supabase
-        .from('leads')
-        .update({ notes: updatedNotes })
-        .eq('id', leadId)
+      const res = await fetch(`/api/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: updatedNotes }),
+      })
 
-      if (error) throw error
+      if (!res.ok) throw new Error('Erro')
 
       setFormData((p) => ({ ...p, notes: updatedNotes }))
       setNewNote('')
@@ -316,11 +320,19 @@ export function LeadDrawer({
     if (!newTag.trim()) return
     const tag = newTag.trim().toLowerCase()
     try {
-      await supabase.from('lead_tags').insert({ lead_id: leadId, tag })
-      await supabase.from('lead_activities').insert({
-        lead_id: leadId,
-        type: 'tag_added',
-        payload: { tag },
+      await fetch('/api/lead-tags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lead_id: leadId, tag }),
+      })
+      await fetch('/api/lead-activities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lead_id: leadId,
+          type: 'tag_added',
+          payload: { tag },
+        }),
       })
       setLead((p) =>
         p
@@ -340,7 +352,9 @@ export function LeadDrawer({
 
   const handleRemoveTag = async (tag: string) => {
     try {
-      await supabase.from('lead_tags').delete().eq('lead_id', leadId).eq('tag', tag)
+      await fetch(`/api/lead-tags?lead_id=${leadId}&tag=${encodeURIComponent(tag)}`, {
+        method: 'DELETE',
+      })
       setLead((p) =>
         p
           ? {
@@ -349,12 +363,17 @@ export function LeadDrawer({
                 (t) => t.tag !== tag
               ),
             }
-          :           null
+          : null
       )
       onUpdate()
     } catch {
       toast.error('Erro ao remover tag')
     }
+  }
+
+  const refreshTasks = async () => {
+    const res = await fetch(`/api/tasks?lead_id=${leadId}`)
+    if (res.ok) setTasks(await res.json())
   }
 
   const tags = (lead?.lead_tags as { tag: string }[]) || []
@@ -389,9 +408,7 @@ export function LeadDrawer({
                     <Label>Nome/Empresa</Label>
                     <Input
                       value={formData.title}
-                      onChange={(e) =>
-                        setFormData((p) => ({ ...p, title: e.target.value }))
-                      }
+                      onChange={(e) => setFormData((p) => ({ ...p, title: e.target.value }))}
                     />
                   </div>
                   <div>
@@ -399,9 +416,7 @@ export function LeadDrawer({
                     <Input
                       type="email"
                       value={formData.email}
-                      onChange={(e) =>
-                        setFormData((p) => ({ ...p, email: e.target.value }))
-                      }
+                      onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
                     />
                   </div>
                   <div>
@@ -409,30 +424,22 @@ export function LeadDrawer({
                     <PhoneInput
                       countryCode={formData.phone_country_code}
                       number={formData.phone}
-                      onCountryCodeChange={(v) =>
-                        setFormData((p) => ({ ...p, phone_country_code: v }))
-                      }
-                      onNumberChange={(v) =>
-                        setFormData((p) => ({ ...p, phone: v }))
-                      }
+                      onCountryCodeChange={(v) => setFormData((p) => ({ ...p, phone_country_code: v }))}
+                      onNumberChange={(v) => setFormData((p) => ({ ...p, phone: v }))}
                     />
                   </div>
                   <div>
                     <Label>Site</Label>
                     <Input
                       value={formData.website}
-                      onChange={(e) =>
-                        setFormData((p) => ({ ...p, website: e.target.value }))
-                      }
+                      onChange={(e) => setFormData((p) => ({ ...p, website: e.target.value }))}
                     />
                   </div>
                   <div>
                     <Label>LinkedIn</Label>
                     <Input
                       value={formData.linkedin}
-                      onChange={(e) =>
-                        setFormData((p) => ({ ...p, linkedin: e.target.value }))
-                      }
+                      onChange={(e) => setFormData((p) => ({ ...p, linkedin: e.target.value }))}
                       placeholder="https://linkedin.com/company/..."
                     />
                   </div>
@@ -440,9 +447,7 @@ export function LeadDrawer({
                     <Label>Facebook</Label>
                     <Input
                       value={formData.facebook}
-                      onChange={(e) =>
-                        setFormData((p) => ({ ...p, facebook: e.target.value }))
-                      }
+                      onChange={(e) => setFormData((p) => ({ ...p, facebook: e.target.value }))}
                       placeholder="https://facebook.com/..."
                     />
                   </div>
@@ -450,9 +455,7 @@ export function LeadDrawer({
                     <Label>Instagram</Label>
                     <Input
                       value={formData.instagram}
-                      onChange={(e) =>
-                        setFormData((p) => ({ ...p, instagram: e.target.value }))
-                      }
+                      onChange={(e) => setFormData((p) => ({ ...p, instagram: e.target.value }))}
                       placeholder="https://instagram.com/..."
                     />
                   </div>
@@ -460,9 +463,7 @@ export function LeadDrawer({
                     <Label>Nome do proprietário</Label>
                     <Input
                       value={formData.nome_dono}
-                      onChange={(e) =>
-                        setFormData((p) => ({ ...p, nome_dono: e.target.value }))
-                      }
+                      onChange={(e) => setFormData((p) => ({ ...p, nome_dono: e.target.value }))}
                     />
                   </div>
                   <div>
@@ -470,9 +471,7 @@ export function LeadDrawer({
                     <Input
                       type="email"
                       value={formData.email_dono}
-                      onChange={(e) =>
-                        setFormData((p) => ({ ...p, email_dono: e.target.value }))
-                      }
+                      onChange={(e) => setFormData((p) => ({ ...p, email_dono: e.target.value }))}
                     />
                   </div>
                   <div>
@@ -480,18 +479,14 @@ export function LeadDrawer({
                     <textarea
                       className="w-full min-h-[60px] rounded-md border px-3 py-2 text-sm"
                       value={formData.resumo}
-                      onChange={(e) =>
-                        setFormData((p) => ({ ...p, resumo: e.target.value }))
-                      }
+                      onChange={(e) => setFormData((p) => ({ ...p, resumo: e.target.value }))}
                     />
                   </div>
                   <div>
                     <Label>Possível nacionalidade</Label>
                     <Input
                       value={formData.nacionalidade}
-                      onChange={(e) =>
-                        setFormData((p) => ({ ...p, nacionalidade: e.target.value }))
-                      }
+                      onChange={(e) => setFormData((p) => ({ ...p, nacionalidade: e.target.value }))}
                       placeholder="Ex: Brasileira, Francesa, Belga..."
                     />
                   </div>
@@ -499,9 +494,7 @@ export function LeadDrawer({
                     <Label>Valor (€)</Label>
                     <Input
                       value={formData.valor}
-                      onChange={(e) =>
-                        setFormData((p) => ({ ...p, valor: e.target.value }))
-                      }
+                      onChange={(e) => setFormData((p) => ({ ...p, valor: e.target.value }))}
                       placeholder="Ex: 1.000,00 ou 1000"
                       inputMode="decimal"
                     />
@@ -510,18 +503,14 @@ export function LeadDrawer({
                     <Label>Origem</Label>
                     <Input
                       value={formData.source}
-                      onChange={(e) =>
-                        setFormData((p) => ({ ...p, source: e.target.value }))
-                      }
+                      onChange={(e) => setFormData((p) => ({ ...p, source: e.target.value }))}
                     />
                   </div>
                   <div>
                     <Label>Responsável</Label>
                     <Select
                       value={formData.assignee_user_id || '__none__'}
-                      onValueChange={(v) =>
-                        setFormData((p) => ({ ...p, assignee_user_id: v }))
-                      }
+                      onValueChange={(v) => setFormData((p) => ({ ...p, assignee_user_id: v }))}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione" />
@@ -541,19 +530,14 @@ export function LeadDrawer({
                     <textarea
                       className="w-full min-h-[100px] rounded-md border px-3 py-2 text-sm"
                       value={formData.notes}
-                      onChange={(e) =>
-                        setFormData((p) => ({ ...p, notes: e.target.value }))
-                      }
+                      onChange={(e) => setFormData((p) => ({ ...p, notes: e.target.value }))}
                     />
                   </div>
                   <div className="flex gap-2">
                     <Button onClick={handleSave} disabled={saving}>
                       Salvar
                     </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => setEditMode(false)}
-                    >
+                    <Button variant="outline" onClick={() => setEditMode(false)}>
                       Cancelar
                     </Button>
                   </div>
@@ -562,17 +546,12 @@ export function LeadDrawer({
                 <div className="space-y-4">
                   <div>
                     <h3 className="font-semibold">{formData.title}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {formData.source}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{formData.source}</p>
                   </div>
                   {formData.email && (
                     <div className="flex items-center gap-2">
                       <Mail className="size-4 text-muted-foreground" />
-                      <a
-                        href={`mailto:${formData.email}`}
-                        className="text-sm hover:underline"
-                      >
+                      <a href={`mailto:${formData.email}`} className="text-sm hover:underline">
                         {formData.email}
                       </a>
                     </div>
@@ -592,16 +571,8 @@ export function LeadDrawer({
                         <span className="text-sm">
                           +{formData.phone_country_code} {displayNumber}
                         </span>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          asChild
-                        >
-                          <a
-                            href={waLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
+                        <Button size="sm" variant="outline" asChild>
+                          <a href={waLink} target="_blank" rel="noopener noreferrer">
                             Entrar em contato (WhatsApp)
                           </a>
                         </Button>
@@ -643,14 +614,9 @@ export function LeadDrawer({
                   {(formData.nome_dono || formData.email_dono) && (
                     <div>
                       <Label>Proprietário</Label>
-                      {formData.nome_dono && (
-                        <p className="text-sm mt-1">{formData.nome_dono}</p>
-                      )}
+                      {formData.nome_dono && <p className="text-sm mt-1">{formData.nome_dono}</p>}
                       {formData.email_dono && (
-                        <a
-                          href={`mailto:${formData.email_dono}`}
-                          className="text-sm hover:underline text-muted-foreground"
-                        >
+                        <a href={`mailto:${formData.email_dono}`} className="text-sm hover:underline text-muted-foreground">
                           {formData.email_dono}
                         </a>
                       )}
@@ -692,9 +658,7 @@ export function LeadDrawer({
                       {formData.valor && (
                         <div>
                           <Label>Valor</Label>
-                          <p className="text-sm mt-1">
-                            {formatCurrency(formData.valor)}
-                          </p>
+                          <p className="text-sm mt-1">{formatCurrency(formData.valor)}</p>
                         </div>
                       )}
                     </div>
@@ -702,9 +666,7 @@ export function LeadDrawer({
                   {formData.notes && (
                     <div>
                       <Label>Notas</Label>
-                      <p className="text-sm mt-1 whitespace-pre-wrap">
-                        {formData.notes}
-                      </p>
+                      <p className="text-sm mt-1 whitespace-pre-wrap">{formData.notes}</p>
                     </div>
                   )}
 
@@ -727,9 +689,7 @@ export function LeadDrawer({
                         placeholder="Nova tag"
                         value={newTag}
                         onChange={(e) => setNewTag(e.target.value)}
-                        onKeyDown={(e) =>
-                          e.key === 'Enter' && (e.preventDefault(), handleAddTag())
-                        }
+                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
                       />
                       <Button size="sm" onClick={handleAddTag}>
                         Adicionar
@@ -738,9 +698,7 @@ export function LeadDrawer({
                   </div>
 
                   <div className="flex flex-wrap gap-2 pt-4">
-                    <Button onClick={() => setEditMode(true)}>
-                      Editar
-                    </Button>
+                    <Button onClick={() => setEditMode(true)}>Editar</Button>
                     {onDelete && (
                       <Button variant="destructive" onClick={handleDeleteLead}>
                         <Trash2 className="mr-2 size-4" />
@@ -766,15 +724,10 @@ export function LeadDrawer({
               <ScrollArea className="h-[400px]">
                 <div className="space-y-3">
                   {activities.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      Nenhuma atividade registrada
-                    </p>
+                    <p className="text-sm text-muted-foreground">Nenhuma atividade registrada</p>
                   ) : (
                     activities.map((a, i) => (
-                      <div
-                        key={i}
-                        className="rounded-lg border p-3 text-sm"
-                      >
+                      <div key={i} className="rounded-lg border p-3 text-sm">
                         <p className="font-medium">
                           {a.type === 'stage_change' && 'Estágio alterado'}
                           {a.type === 'assignee_change' && (() => {
@@ -787,10 +740,8 @@ export function LeadDrawer({
                             return 'Responsável alterado'
                           })()}
                           {a.type === 'field_edit' && 'Dados editados'}
-                          {a.type === 'note_added' &&
-                            `Nota: ${(a.payload as { note?: string })?.note || ''}`}
-                          {a.type === 'tag_added' &&
-                            `Tag adicionada: ${(a.payload as { tag?: string })?.tag || ''}`}
+                          {a.type === 'note_added' && `Nota: ${(a.payload as { note?: string })?.note || ''}`}
+                          {a.type === 'tag_added' && `Tag adicionada: ${(a.payload as { tag?: string })?.tag || ''}`}
                           {a.type === 'created' && 'Lead criado'}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
@@ -813,9 +764,7 @@ export function LeadDrawer({
               <ScrollArea className="h-[360px]">
                 <div className="space-y-3">
                   {tasks.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      Nenhuma tarefa
-                    </p>
+                    <p className="text-sm text-muted-foreground">Nenhuma tarefa</p>
                   ) : (
                     (tasks as { id: string; title: string; description: string | null; status: string; due_date: string; assigned_to: string | null }[]).map(
                       (t) => (
@@ -827,9 +776,7 @@ export function LeadDrawer({
                             <p className="font-medium">{t.title}</p>
                             <p className="text-xs text-muted-foreground">
                               {t.status} •{' '}
-                              {t.due_date
-                                ? new Date(t.due_date).toLocaleDateString('pt-BR')
-                                : 'Sem data'}
+                              {t.due_date ? new Date(t.due_date).toLocaleDateString('pt-BR') : 'Sem data'}
                             </p>
                           </div>
                           <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -856,20 +803,15 @@ export function LeadDrawer({
                               variant="ghost"
                               size="icon"
                               className="size-8 text-destructive hover:text-destructive"
-                              onClick={(e) => {
+                              onClick={async (e) => {
                                 e.stopPropagation()
                                 if (!confirm('Excluir esta tarefa?')) return
-                                supabase
-                                  .from('tasks')
-                                  .delete()
-                                  .eq('id', t.id)
-                                  .then(({ error }) => {
-                                    if (error) toast.error(getErrorMessage(error, 'Erro ao excluir'))
-                                    else {
-                                      setTasks((prev) => prev.filter((x) => x.id !== t.id))
-                                      toast.success('Tarefa excluída')
-                                    }
-                                  })
+                                const res = await fetch(`/api/tasks/${t.id}`, { method: 'DELETE' })
+                                if (!res.ok) toast.error('Erro ao excluir')
+                                else {
+                                  setTasks((prev) => prev.filter((x) => (x as { id: string }).id !== t.id))
+                                  toast.success('Tarefa excluída')
+                                }
                               }}
                             >
                               <Trash2 className="size-4" />
@@ -885,28 +827,14 @@ export function LeadDrawer({
                 open={addTaskOpen}
                 onOpenChange={setAddTaskOpen}
                 leadId={leadId}
-                onTaskCreated={() => {
-                  supabase
-                    .from('tasks')
-                    .select('*')
-                    .eq('lead_id', leadId)
-                    .order('due_date', { ascending: true })
-                    .then(({ data }) => setTasks(data || []))
-                }}
+                onTaskCreated={refreshTasks}
                 members={members}
               />
               <EditTaskModal
                 open={editTaskOpen}
                 onOpenChange={setEditTaskOpen}
                 task={editingTask}
-                onTaskUpdated={() => {
-                  supabase
-                    .from('tasks')
-                    .select('*')
-                    .eq('lead_id', leadId)
-                    .order('due_date', { ascending: true })
-                    .then(({ data }) => setTasks(data || []))
-                }}
+                onTaskUpdated={refreshTasks}
                 members={members}
               />
             </TabsContent>

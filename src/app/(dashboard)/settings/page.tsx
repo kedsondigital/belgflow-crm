@@ -1,20 +1,16 @@
-import { createClient } from '@/lib/supabase/server'
+import { getSession } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import { SettingsForm } from '@/components/settings-form'
 
 export default async function SettingsPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const session = await getSession()
+  if (!session?.user) redirect('/login')
 
-  if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
+  const profile = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { id: true, name: true, email: true },
+  })
 
   return (
     <div className="space-y-6">

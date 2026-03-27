@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getSession } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
-/** Cria lead via API - tenta com todos os campos, fallback sem colunas extras se schema antigo */
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const session = await getSession()
 
-  if (!user) {
+  if (!session?.user) {
     return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
   }
 
@@ -43,64 +40,34 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const basePayload = {
-      pipeline_id,
-      stage_id,
-      title: String(title).trim(),
-      email: email?.trim() || null,
-      phone: phone?.trim() || null,
-      whatsapp: whatsapp || null,
-      source: source || 'manual',
-      position: typeof position === 'number' ? position : 0,
-    }
+    const lead = await prisma.lead.create({
+      data: {
+        pipelineId: pipeline_id,
+        stageId: stage_id,
+        title: String(title).trim(),
+        email: email?.trim() || null,
+        phone: phone?.trim() || null,
+        phoneCountryCode: phone?.trim() ? phone_country_code || '32' : null,
+        whatsapp: whatsapp || null,
+        resumo: resumo?.trim() || null,
+        nacionalidade: nacionalidade && nacionalidade !== '__none__' ? nacionalidade : null,
+        valor: valor != null && String(valor).trim() !== '' ? String(valor) : null,
+        source: source || 'manual',
+        position: typeof position === 'number' ? position : 0,
+        linkedin: linkedin?.trim() || null,
+        facebook: facebook?.trim() || null,
+        instagram: instagram?.trim() || null,
+        nomeDono: nome_dono?.trim() || null,
+        emailDono: email_dono?.trim() || null,
+      },
+    })
 
-    const fullPayload = {
-      ...basePayload,
-      phone_country_code: phone?.trim() ? phone_country_code || '32' : null,
-      resumo: resumo?.trim() || null,
-      nacionalidade: nacionalidade && nacionalidade !== '__none__' ? nacionalidade : null,
-      valor: valor != null && !Number.isNaN(Number(valor)) ? Number(valor) : null,
-      linkedin: linkedin?.trim() || null,
-      facebook: facebook?.trim() || null,
-      instagram: instagram?.trim() || null,
-      nome_dono: nome_dono?.trim() || null,
-      email_dono: email_dono?.trim() || null,
-    }
-
-    const { data: lead, error } = await supabase
-      .from('leads')
-      .insert(fullPayload)
-      .select()
-      .single()
-
-    if (error) {
-      const msg = String(error.message || '')
-      if (msg.includes('nacionalidade') || msg.includes('schema cache') || msg.includes('column')) {
-        const { data: fallbackLead, error: fallbackError } = await supabase
-          .from('leads')
-          .insert(basePayload)
-          .select()
-          .single()
-
-        if (fallbackError) {
-          return NextResponse.json({ error: fallbackError.message }, { status: 400 })
-        }
-
-        await supabase.from('lead_activities').insert({
-          lead_id: fallbackLead.id,
-          type: 'created',
-          payload: {},
-        })
-
-        return NextResponse.json({ lead: fallbackLead })
-      }
-      return NextResponse.json({ error: error.message }, { status: 400 })
-    }
-
-    await supabase.from('lead_activities').insert({
-      lead_id: lead.id,
-      type: 'created',
-      payload: {},
+    await prisma.leadActivity.create({
+      data: {
+        leadId: lead.id,
+        type: 'created',
+        payload: {},
+      },
     })
 
     return NextResponse.json({ lead })

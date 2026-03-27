@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getSession } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
-/** Atualiza lead - fallback sem colunas extras se schema antigo */
 export async function PATCH(request: NextRequest) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const session = await getSession()
 
-  if (!user) {
+  if (!session?.user) {
     return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
   }
 
@@ -22,56 +19,28 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'id é obrigatório' }, { status: 400 })
     }
 
-    const fullPayload: Record<string, unknown> = {
-      title: fields.title,
-      email: fields.email || null,
-      phone: fields.phone || null,
-      phone_country_code: fields.phone ? (fields.phone_country_code || '32') : null,
-      whatsapp: fields.whatsapp || null,
-      website: fields.website || null,
-      source: fields.source || 'manual',
-      notes: fields.notes || null,
-      assignee_user_id: fields.assignee_user_id && fields.assignee_user_id !== '__none__' ? fields.assignee_user_id : null,
-      resumo: fields.resumo || null,
-      nacionalidade: fields.nacionalidade && fields.nacionalidade !== '__none__' ? fields.nacionalidade : null,
-      valor: fields.valor != null && !Number.isNaN(Number(fields.valor)) ? Number(fields.valor) : null,
-      linkedin: fields.linkedin || null,
-      facebook: fields.facebook || null,
-      instagram: fields.instagram || null,
-      nome_dono: fields.nome_dono || null,
-      email_dono: fields.email_dono || null,
-    }
-
-    const { error } = await supabase
-      .from('leads')
-      .update(fullPayload)
-      .eq('id', id)
-
-    if (error) {
-      const msg = String(error.message || '')
-      if (msg.includes('nacionalidade') || msg.includes('schema cache') || msg.includes('column')) {
-        const basePayload = {
-          title: fields.title,
-          email: fields.email || null,
-          phone: fields.phone || null,
-          whatsapp: fields.whatsapp || null,
-          website: fields.website || null,
-          source: fields.source || 'manual',
-          notes: fields.notes || null,
-          assignee_user_id: fields.assignee_user_id && fields.assignee_user_id !== '__none__' ? fields.assignee_user_id : null,
-        }
-        const { error: fallbackError } = await supabase
-          .from('leads')
-          .update(basePayload)
-          .eq('id', id)
-
-        if (fallbackError) {
-          return NextResponse.json({ error: fallbackError.message }, { status: 400 })
-        }
-        return NextResponse.json({ ok: true })
-      }
-      return NextResponse.json({ error: error.message }, { status: 400 })
-    }
+    await prisma.lead.update({
+      where: { id },
+      data: {
+        title: fields.title,
+        email: fields.email || null,
+        phone: fields.phone || null,
+        phoneCountryCode: fields.phone ? (fields.phone_country_code || '32') : null,
+        whatsapp: fields.whatsapp || null,
+        website: fields.website || null,
+        source: fields.source || 'manual',
+        notes: fields.notes || null,
+        assigneeUserId: fields.assignee_user_id && fields.assignee_user_id !== '__none__' ? fields.assignee_user_id : null,
+        resumo: fields.resumo || null,
+        nacionalidade: fields.nacionalidade && fields.nacionalidade !== '__none__' ? fields.nacionalidade : null,
+        valor: fields.valor != null && String(fields.valor).trim() !== '' ? String(fields.valor) : null,
+        linkedin: fields.linkedin || null,
+        facebook: fields.facebook || null,
+        instagram: fields.instagram || null,
+        nomeDono: fields.nome_dono || null,
+        emailDono: fields.email_dono || null,
+      },
+    })
 
     return NextResponse.json({ ok: true })
   } catch (err) {
