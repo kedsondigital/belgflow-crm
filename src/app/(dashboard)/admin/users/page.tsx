@@ -16,16 +16,14 @@ export default async function AdminUsersPage() {
     redirect('/pipelines')
   }
 
-  const [users, pipelines, pipelineMembers] = await Promise.all([
-    prisma.user.findMany({ orderBy: { createdAt: 'desc' } }),
-    prisma.pipeline.findMany({
-      where: { isArchived: false },
-      select: { id: true, name: true },
-    }),
-    prisma.pipelineMember.findMany({
-      select: { pipelineId: true, userId: true, roleInPipeline: true },
-    }),
-  ])
+  const users = await prisma.user.findMany({ orderBy: { createdAt: 'desc' } })
+  const pipelines = await prisma.pipeline.findMany({
+    where: { isArchived: false },
+    select: { id: true, name: true },
+  })
+  const pipelineMembers = await prisma.pipelineMember.findMany({
+    select: { pipelineId: true, userId: true, roleInPipeline: true },
+  })
 
   return (
     <AdminUsersContent
