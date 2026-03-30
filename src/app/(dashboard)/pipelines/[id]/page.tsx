@@ -116,11 +116,13 @@ export default async function PipelinePage({
       })),
   }))
 
-  const membersMapped = members.map((m) => ({
-    id: m.user.id,
-    name: m.user.name || '',
-    email: m.user.email || '',
-  }))
+  const membersMapped = members
+    .filter((m) => m.user !== null)
+    .map((m) => ({
+      id: m.user.id,
+      name: m.user.name || '',
+      email: m.user.email || '',
+    }))
 
   const adminsMapped = admins.map((p) => ({
     id: p.id,
