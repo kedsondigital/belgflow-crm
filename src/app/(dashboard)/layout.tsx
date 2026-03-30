@@ -17,9 +17,15 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
-  const profile = await prisma.user.findUnique({
+  let profile = await prisma.user.findUnique({
     where: { id: session.user.id },
   })
+
+  if (!profile && session.user.email) {
+    profile = await prisma.user.findUnique({
+      where: { email: session.user.email },
+    })
+  }
 
   const profileData = profile
     ? {

@@ -7,10 +7,17 @@ export default async function PipelinesPage() {
   const session = await getSession()
   if (!session?.user) redirect('/login')
 
-  const profile = await prisma.user.findUnique({
+  let profile = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { roleGlobal: true },
+    select: { roleGlobal: true, id: true },
   })
+
+  if (!profile && session.user.email) {
+    profile = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { roleGlobal: true, id: true },
+    })
+  }
 
   const isAdmin = profile?.roleGlobal === 'ADMIN'
 
